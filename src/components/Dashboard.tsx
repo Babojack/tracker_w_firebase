@@ -1,76 +1,131 @@
-// Dashboard.tsx
+// src/components/Dashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Activity,   // для ProjectTracker
-  Target,     // для GoalsTracker
-  BarChart2,  // для MoodTracker
-  Brain,      // для LifeEQTracker
-  Plus,       // для ToDo
-  Calculator, // для Household Budget
-  Gift        // для Wunschliste
+  Activity,    // иконка для Project Tracker
+  Target,      // иконка для Goals Tracker
+  BarChart2,   // иконка для Mood Tracker
+  Brain,       // иконка для LifeEQ Tracker
+  Plus,        // иконка для ToDo Tracker
+  Calculator,  // иконка для Household Budget
+  Gift         // иконка для Wunschliste
 } from 'lucide-react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 
 const Dashboard: React.FC = () => {
   const uid = auth.currentUser?.uid;
+  if (!uid) return <div>No user logged in.</div>;
 
-  // Состояния для статистики (будут обновляться в реальном времени)
-  const [projectStats, setProjectStats] = useState({ done: 0, inProgress: 0, notStarted: 0 });
-  const [goalStats, setGoalStats] = useState({ done: 0, inProgress: 0, notStarted: 0 });
-  const [moodCount, setMoodCount] = useState(0);
+  // -------------------------------
+  // Состояния для статистики (реальные данные)
+  // -------------------------------
+  const [projectStats, setProjectStats] = useState({ total: 0, done: 0, inProgress: 0 });
+  const [goalStats, setGoalStats] = useState({ total: 0, done: 0, inProgress: 0 });
+  const [moodStats, setMoodStats] = useState({ total: 0, weeklyTrendEmoji: 'N/A', averageMood: 0 });
   const [lifeEQCount, setLifeEQCount] = useState(0);
-  const [todoStats, setTodoStats] = useState({ active: 0, completed: 0 });
-  const [budgetTotal, setBudgetTotal] = useState(0);
-  const [wishlistCount, setWishlistCount] = useState(0);
+  const [todoStats, setTodoStats] = useState({ total: 0, active: 0, completed: 0 });
+  const [budgetStats, setBudgetStats] = useState({ totalIncome: 0, totalExpenses: 0, balance: 0 });
+  const [wishlistStats, setWishlistStats] = useState({ total: 0, totalCost: 0 });
 
+  // -------------------------------
+  // Вспомогательная функция: преобразование строки в число (если используется запятая)
+  // -------------------------------
+  const parseAmount = (value: string): number =>
+    parseFloat(value.replace(',', '.'));
+
+  // -------------------------------
+  // Подписки на Firestore (реальное обновление данных)
+  // -------------------------------
   useEffect(() => {
-    if (!uid) return;
-
-    // Подписка на изменения в коллекции "projectTrackerGoals"
-    const qProjects = query(collection(db, 'projectTrackerGoals'), where('userId', '==', uid));
-    const unsubscribeProjects = onSnapshot(qProjects, (snapshot) => {
-      let done = 0, inProgress = 0, notStarted = 0;
+    // PROJECT TRACKER – коллекция "projectTrackerGoals"
+    const qProjects = query(
+      collection(db, 'projectTrackerGoals'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeProjects = onSnapshot(qProjects, snapshot => {
+      let done = 0, inProgress = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.status === 'Done') done++;
         else if (data.status === 'In Progress') inProgress++;
-        else notStarted++;
       });
-      setProjectStats({ done, inProgress, notStarted });
+      setProjectStats({ total: snapshot.size, done, inProgress });
     });
 
-    // Подписка на коллекцию "goalsTracker"
-    const qGoals = query(collection(db, 'goalsTracker'), where('userId', '==', uid));
-    const unsubscribeGoals = onSnapshot(qGoals, (snapshot) => {
-      let done = 0, inProgress = 0, notStarted = 0;
+    // GOALS TRACKER – коллекция "goalsTracker"
+    const qGoals = query(
+      collection(db, 'goalsTracker'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeGoals = onSnapshot(qGoals, snapshot => {
+      let done = 0, inProgress = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.status === 'Done') done++;
         else if (data.status === 'In Progress') inProgress++;
-        else notStarted++;
       });
-      setGoalStats({ done, inProgress, notStarted });
+      setGoalStats({ total: snapshot.size, done, inProgress });
     });
 
-    // Подписка на Mood Tracker: коллекция "moodEntries"
-    const qMood = query(collection(db, 'moodEntries'), where('userId', '==', uid));
-    const unsubscribeMood = onSnapshot(qMood, (snapshot) => {
-      setMoodCount(snapshot.size);
+    // MOOD TRACKER – коллекция "moodEntries"
+    // Подписка для общего количества записей
+    const qMoodTotal = query(
+      collection(db, 'moodEntries'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeMoodTotal = onSnapshot(qMoodTotal, snapshot => {
+      setMoodStats(prev => ({ ...prev, total: snapshot.size }));
+    });
+    // Отдельно вычисляем недельный тренд (записи за последние 7 дней)
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const qMoodWeekly = query(
+      collection(db, 'moodEntries'),
+      where('userId', '==', uid),
+      where('timestamp', '>=', oneWeekAgo.toISOString())
+    );
+    getDocs(qMoodWeekly).then(snapshot => {
+      let sumMood = 0, count = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.mood && typeof data.mood.id === 'number') {
+          sumMood += data.mood.id;
+          count++;
+        }
+      });
+      const averageMood = count > 0 ? sumMood / count : 0;
+      let weeklyTrendEmoji = 'N/A';
+      if (averageMood >= 4.5) weeklyTrendEmoji = '😃';
+      else if (averageMood >= 3.5) weeklyTrendEmoji = '🙂';
+      else if (averageMood >= 2.5) weeklyTrendEmoji = '😐';
+      else if (averageMood >= 1.5) weeklyTrendEmoji = '🙁';
+      else if (averageMood > 0) weeklyTrendEmoji = '😞';
+      setMoodStats(prev => ({
+        ...prev,
+        weeklyTrendEmoji,
+        averageMood: Number(averageMood.toFixed(1))
+      }));
     });
 
-    // Подписка на LifeEQ Tracker: коллекция "lifeEQEntries"
-    const qLifeEQ = query(collection(db, 'lifeEQEntries'), where('userId', '==', uid));
-    const unsubscribeLifeEQ = onSnapshot(qLifeEQ, (snapshot) => {
+    // LIFE EQ TRACKER – коллекция "lifeEQEntries"
+    const qLifeEQ = query(
+      collection(db, 'lifeEQEntries'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeLifeEQ = onSnapshot(qLifeEQ, snapshot => {
       setLifeEQCount(snapshot.size);
     });
 
-    // Подписка на ToDo Tracker: коллекция "todoGroups"
-    const qTodos = query(collection(db, 'todoGroups'), where('userId', '==', uid));
-    const unsubscribeTodos = onSnapshot(qTodos, (snapshot) => {
-      let active = 0, completed = 0;
+    // TODO TRACKER – коллекция "todoGroups"
+    const qTodos = query(
+      collection(db, 'todoGroups'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeTodos = onSnapshot(qTodos, snapshot => {
+      let total = 0, active = 0, completed = 0;
       snapshot.forEach(doc => {
+        total++;
         const data = doc.data();
         if (Array.isArray(data.todos)) {
           data.todos.forEach((todo: any) => {
@@ -79,92 +134,129 @@ const Dashboard: React.FC = () => {
           });
         }
       });
-      setTodoStats({ active, completed });
+      setTodoStats({ total, active, completed });
     });
 
-    // Подписка на Household Budget: коллекция "householdBudget"
-    const qBudget = query(collection(db, 'householdBudget'), where('userId', '==', uid));
-    const unsubscribeBudget = onSnapshot(qBudget, (snapshot) => {
-      let total = 0;
+    // HOUSEHOLD BUDGET – сбор данных из коллекций "incomes" и "expenses"
+    const qIncomes = query(
+      collection(db, 'incomes'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeIncomes = onSnapshot(qIncomes, snapshot => {
+      let totalIncome = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
-        total += Number(data.amount) || 0;
+        totalIncome += parseAmount(data.amount || '0');
       });
-      setBudgetTotal(total);
+      setBudgetStats(prev => ({
+        ...prev,
+        totalIncome,
+        balance: totalIncome - prev.totalExpenses
+      }));
+    });
+    const qExpenses = query(
+      collection(db, 'expenses'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeExpenses = onSnapshot(qExpenses, snapshot => {
+      let totalExpenses = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        totalExpenses += parseAmount(data.amount || '0');
+      });
+      setBudgetStats(prev => ({
+        ...prev,
+        totalExpenses,
+        balance: prev.totalIncome - totalExpenses
+      }));
     });
 
-    // Подписка на Wunschliste: коллекция "wishlist"
-    const qWishlist = query(collection(db, 'wishlist'), where('userId', '==', uid));
-    const unsubscribeWishlist = onSnapshot(qWishlist, (snapshot) => {
-      setWishlistCount(snapshot.size);
+    // WISHLIST – коллекция "wishlist"
+    const qWishlist = query(
+      collection(db, 'wishlist'),
+      where('userId', '==', uid)
+    );
+    const unsubscribeWishlist = onSnapshot(qWishlist, snapshot => {
+      let total = snapshot.size;
+      let totalCost = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        totalCost += parseAmount(data.price || '0');
+      });
+      setWishlistStats({ total, totalCost });
     });
 
-    // Отписываемся от всех слушателей при размонтировании
+    // Очистка подписок при размонтировании компонента
     return () => {
       unsubscribeProjects();
       unsubscribeGoals();
-      unsubscribeMood();
+      unsubscribeMoodTotal();
       unsubscribeLifeEQ();
       unsubscribeTodos();
-      unsubscribeBudget();
+      unsubscribeIncomes();
+      unsubscribeExpenses();
       unsubscribeWishlist();
     };
-
   }, [uid]);
 
-  // Формирование карточек с реальными данными
+  // -------------------------------
+  // Формирование карточек с данными для отображения
+  // -------------------------------
   const cards = [
     {
       title: 'Project Tracker',
-      description: 'Управляй своими проектами',
+      description: 'Manage your projects efficiently.',
       icon: <Activity size={32} />,
       tab: 'projects',
-      stat: `${projectStats.done + projectStats.inProgress + projectStats.notStarted} проектов (Выполнено: ${projectStats.done}, В процессе: ${projectStats.inProgress})`
+      stat: `Total: ${projectStats.total} projects. Completed: ${projectStats.done}. In Progress: ${projectStats.inProgress}.`
     },
     {
       title: 'Goals Tracker',
-      description: 'Ставь и достигай цели',
+      description: 'Set and achieve your goals.',
       icon: <Target size={32} />,
       tab: 'goals',
-      stat: `${goalStats.done + goalStats.inProgress + goalStats.notStarted} целей (Выполнено: ${goalStats.done}, В процессе: ${goalStats.inProgress})`
+      stat: `Total: ${goalStats.total} goals. Completed: ${goalStats.done}. In Progress: ${goalStats.inProgress}.`
     },
     {
       title: 'Mood Tracker',
-      description: 'Отслеживай настроение',
+      description: 'Monitor your weekly mood trend.',
       icon: <BarChart2 size={32} />,
       tab: 'mood',
-      stat: `${moodCount} записей`
+      stat: `Weekly Trend: ${moodStats.weeklyTrendEmoji} (Avg: ${moodStats.averageMood}) from ${moodStats.total} entries.`
     },
     {
       title: 'LifeEQ Tracker',
-      description: 'Радар сбалансированной жизни',
+      description: 'Assess your overall life balance.',
       icon: <Brain size={32} />,
       tab: 'lifeEQ',
-      stat: `${lifeEQCount} записей`
+      stat: `Total Entries: ${lifeEQCount}.`
     },
     {
       title: "ToDo's",
-      description: 'Задачи и заметки',
+      description: 'Keep track of your tasks.',
       icon: <Plus size={32} />,
       tab: 'todos',
-      stat: `${todoStats.active + todoStats.completed} задач (Активных: ${todoStats.active})`
+      stat: `Total Tasks: ${todoStats.total}. Active: ${todoStats.active}. Completed: ${todoStats.completed}.`
     },
     {
       title: 'Household Budget',
-      description: 'Веди бюджет и расходы',
+      description: 'Monitor your incomes and expenses.',
       icon: <Calculator size={32} />,
       tab: 'budget',
-      stat: `Общий расход: ${budgetTotal}`
+      stat: `Income: $${budgetStats.totalIncome.toFixed(2)}. Expenses: $${budgetStats.totalExpenses.toFixed(2)}. Balance: $${budgetStats.balance.toFixed(2)}.`
     },
     {
-      title: 'Wunschliste',
-      description: 'Список желаний и покупок',
+      title: 'Wishlist',
+      description: 'Review your wishes and estimated costs.',
       icon: <Gift size={32} />,
       tab: 'wishlist',
-      stat: `${wishlistCount} желаний`
+      stat: `Total Wishes: ${wishlistStats.total}. Estimated Cost: $${wishlistStats.totalCost.toFixed(2)}.`
     },
   ];
 
+  // -------------------------------
+  // Рендеринг карточек Dashboard
+  // -------------------------------
   return (
     <div className="p-4 sm:p-6 md:p-8">
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
