@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Activity,
   BarChart2,
@@ -17,16 +18,14 @@ import TodoTracker from './components/trackers/TodoTracker';
 import HouseholdBudgetCalculator from './components/trackers/HouseholdBudgetCalculator';
 import WishlistTracker from './components/trackers/WishlistTracker';
 
-import ProfileSettings from './components/ProfileSettings'; // Ваш компонент с настройками профиля
+import ProfileSettings from './components/ProfileSettings';
 import AuthComponent from './components/AuthComponent';
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
-// Пример: при желании можно добавить собственный Dashboard-компонент
-const Dashboard: React.FC = () => {
-  return <div className="text-white">Здесь контент вашей «Главной страницы» (Dashboard)</div>;
-};
+// Импортируем Dashboard из файла Dashboard.tsx
+import Dashboard from './components/Dashboard';
 
 // Типы для вкладок (без Dashboard!)
 type TabId = 'projects' | 'goals' | 'mood' | 'lifeEQ' | 'todos' | 'budget' | 'wishlist';
@@ -110,6 +109,9 @@ const ProfileMenu: React.FC<{
 };
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -132,32 +134,53 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Пример: загружаем из Firestore настройки пользователя (активная вкладка и т.п.)
+  // Обработка URL параметров
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+
+    if (tabParam && ['projects', 'goals', 'mood', 'lifeEQ', 'todos', 'budget', 'wishlist'].includes(tabParam)) {
+      setActiveTab(tabParam as TabId);
+      setShowDashboard(false);
+      setShowProfileSettings(false);
+    }
+  }, [location.search]);
+
+  // Загружаем из Firestore настройки пользователя
   useEffect(() => {
     const fetchUserSettings = async () => {
       if (user) {
         const settingsRef = doc(db, 'userSettings', user.uid);
         const settingsSnap = await getDoc(settingsRef);
-        if (settingsSnap.exists()) {
-          const data = settingsSnap.data();
-          if (data.activeTab) {
-            setActiveTab(data.activeTab);
+
+        // Если в URL нет параметра tab, используем настройки из Firestore
+        const params = new URLSearchParams(location.search);
+        const tabParam = params.get('tab');
+
+        if (!tabParam) {
+          if (settingsSnap.exists()) {
+            const data = settingsSnap.data();
+            if (data.activeTab) {
+              setActiveTab(data.activeTab);
+            }
+          } else {
+            await setDoc(settingsRef, { activeTab: 'projects' });
           }
-          // Если хотите хранить showDashboard / showProfileSettings в Firestore, тоже можно
-        } else {
-          await setDoc(settingsRef, { activeTab: 'projects' });
         }
       }
     };
     fetchUserSettings();
-  }, [user]);
+  }, [user, location.search]);
 
-  // При клике на вкладку убираем Dashboard/Settings
+  // При клике на вкладку убираем Dashboard/Settings и обновляем URL
   const handleTabClick = async (tabId: TabId) => {
     setActiveTab(tabId);
     setShowDashboard(false);
     setShowProfileSettings(false);
     setIsMobileMenuOpen(false);
+
+    // Обновляем URL
+    navigate(`/?tab=${tabId}`);
 
     if (user) {
       const settingsRef = doc(db, 'userSettings', user.uid);
@@ -173,12 +196,14 @@ const App: React.FC = () => {
   const handleShowDashboard = () => {
     setShowDashboard(true);
     setShowProfileSettings(false);
+    navigate('/'); // Очищаем URL параметры
   };
 
   // Показать ProfileSettings (из меню профиля)
   const handleShowProfileSettings = () => {
     setShowProfileSettings(true);
     setShowDashboard(false);
+    navigate('/'); // Очищаем URL параметры
   };
 
   // Пример Import/Export
