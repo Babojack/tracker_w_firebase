@@ -3,9 +3,8 @@ import { Plus, X, Star, Archive } from 'lucide-react';
 import Note from '../shared/Note';
 import Milestone from '../shared/Milestone';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
-import { db, auth } from './../../firebaseConfig'; // Stelle sicher, dass auth hier ebenfalls exportiert wird
+import { db, auth } from './../../firebaseConfig';
 
-// Da Firestore IDs als Strings zurückgibt, passen wir den Typ an:
 interface Goal {
   id: string;
   name: string;
@@ -150,7 +149,12 @@ const ProjectTracker: React.FC = () => {
       g.id === goalId ? { ...g, notes: [newNote, ...g.notes] } : g
     );
     setGoals(updatedGoals);
-    // Hier könnte man auch ein updateDoc aufrufen, um Firestore zu aktualisieren.
+    // Optionale Firestore-Aktualisierung:
+    const goal = updatedGoals.find(g => g.id === goalId);
+    if (goal) {
+      const goalRef = doc(db, "projectTrackerGoals", goalId);
+      updateDoc(goalRef, { notes: goal.notes }).catch(error => console.error("Error updating notes:", error));
+    }
   };
 
   const addNewGoal = async () => {
@@ -189,7 +193,12 @@ const ProjectTracker: React.FC = () => {
       g.id === goalId ? { ...g, archived: !g.archived } : g
     );
     setGoals(updatedGoals);
-    // Optional: updateDoc in Firestore ergänzen
+    // Firestore-Aktualisierung
+    const goal = updatedGoals.find(g => g.id === goalId);
+    if (goal) {
+      const goalRef = doc(db, "projectTrackerGoals", goalId);
+      updateDoc(goalRef, { archived: goal.archived }).catch(error => console.error("Error updating archive:", error));
+    }
   };
 
   const toggleFavoriteGoal = (goalId: string) => {
@@ -197,7 +206,26 @@ const ProjectTracker: React.FC = () => {
       g.id === goalId ? { ...g, favorite: !g.favorite } : g
     );
     setGoals(updatedGoals);
-    // Optional: updateDoc in Firestore ergänzen
+    // Firestore-Aktualisierung
+    const goal = updatedGoals.find(g => g.id === goalId);
+    if (goal) {
+      const goalRef = doc(db, "projectTrackerGoals", goalId);
+      updateDoc(goalRef, { favorite: goal.favorite }).catch(error => console.error("Error updating favorite:", error));
+    }
+  };
+
+  // Helper-Funktion, um die Milestones (Tasks) eines Goals in Firestore zu aktualisieren
+  const updateGoalMilestones = async (goalId: string, updatedMilestones: Goal['milestones'], newStatus?: string) => {
+    try {
+      const goalRef = doc(db, "projectTrackerGoals", goalId);
+      const updateData: any = { milestones: updatedMilestones };
+      if (newStatus !== undefined) {
+        updateData.status = newStatus;
+      }
+      await updateDoc(goalRef, updateData);
+    } catch (error) {
+      console.error("Error updating milestones for goal:", goalId, error);
+    }
   };
 
   // Drag and Drop Funktionen
@@ -440,13 +468,14 @@ const ProjectTracker: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs sm:text-sm font-semibold">Tasks</h3>
                   <button
-                    onClick={() =>
-                      setGoals(goals.map(g =>
-                        g.id === goal.id
-                          ? { ...g, milestones: [...g.milestones, { id: Date.now().toString(), name: 'New Task', completed: false }] }
-                          : g
-                      ))
-                    }
+                    onClick={async () => {
+                      const newTask = { id: Date.now().toString(), name: 'New Task', completed: false };
+                      const updatedMilestones = [...goal.milestones, newTask];
+                      // Update lokale State:
+                      setGoals(goals.map(g => g.id === goal.id ? { ...g, milestones: updatedMilestones } : g));
+                      // Update Firestore:
+                      await updateGoalMilestones(goal.id, updatedMilestones);
+                    }}
                     className="p-1 hover:bg-gray-600 rounded"
                     aria-label="Add task"
                   >
@@ -458,27 +487,27 @@ const ProjectTracker: React.FC = () => {
                     <Milestone
                       key={milestone.id}
                       milestone={milestone}
-                      onToggle={() => {
+                      onToggle={async () => {
                         const updatedMilestones = goal.milestones.map(m =>
                           m.id === milestone.id ? { ...m, completed: !m.completed } : m
                         );
-                        const updatedGoal = { ...goal, milestones: updatedMilestones, status: updateGoalStatus({ ...goal, milestones: updatedMilestones }) };
+                        const newStatus = updateGoalStatus({ ...goal, milestones: updatedMilestones });
+                        const updatedGoal = { ...goal, milestones: updatedMilestones, status: newStatus };
                         setGoals(goals.map(g => g.id === goal.id ? updatedGoal : g));
+                        await updateGoalMilestones(goal.id, updatedMilestones, newStatus);
                       }}
-                      onUpdate={(name) =>
-                        setGoals(goals.map(g => ({
-                          ...g,
-                          milestones: g.id === goal.id
-                            ? g.milestones.map(m => m.id === milestone.id ? { ...m, name } : m)
-                            : g.milestones
-                        })))
-                      }
-                      onDelete={() =>
-                        setGoals(goals.map(g => ({
-                          ...g,
-                          milestones: g.id === goal.id ? g.milestones.filter(m => m.id !== milestone.id) : g.milestones
-                        })))
-                      }
+                      onUpdate={async (name) => {
+                        const updatedMilestones = goal.milestones.map(m =>
+                          m.id === milestone.id ? { ...m, name } : m
+                        );
+                        setGoals(goals.map(g => g.id === goal.id ? { ...g, milestones: updatedMilestones } : g));
+                        await updateGoalMilestones(goal.id, updatedMilestones);
+                      }}
+                      onDelete={async () => {
+                        const updatedMilestones = goal.milestones.filter(m => m.id !== milestone.id);
+                        setGoals(goals.map(g => g.id === goal.id ? { ...g, milestones: updatedMilestones } : g));
+                        await updateGoalMilestones(goal.id, updatedMilestones);
+                      }}
                     />
                   ))}
                 </div>
