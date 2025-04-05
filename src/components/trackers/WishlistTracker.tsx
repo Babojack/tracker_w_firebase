@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore';
 
 interface WishlistItem {
-  id?: string; // Beim Speichern neu: id wird von Firestore generiert
+  id?: string; // При сохранении новый id генерируется Firestore
   name: string;
   description: string;
   priority: 'niedrig' | 'mittel' | 'hoch';
@@ -32,18 +32,18 @@ interface WishlistItem {
   category: string;
   targetDate: string;
   createdAt: number;
-  image?: string;
-  userId?: string;
+  image: string; // теперь обязательное поле
+  userId: string;
 }
 
 interface Category {
   id: string;
   name: string;
-  userId?: string;
+  userId: string;
 }
 
 const WishlistTracker: React.FC = () => {
-  // STATES für Items, Kategorien und Formular
+  // Состояния для Items, категорий и формы
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState('');
@@ -59,9 +59,9 @@ const WishlistTracker: React.FC = () => {
   const [itemUrl, setItemUrl] = useState('');
   const [itemCategory, setItemCategory] = useState('');
   const [itemTargetDate, setItemTargetDate] = useState('');
-  const [itemImage, setItemImage] = useState<string | undefined>(undefined);
+  const [itemImage, setItemImage] = useState<string>(''); // теперь обязательное поле
 
-  // Items und Kategorien aus Firestore laden (nur die des aktuellen Users)
+  // Данные загружаются только для текущего пользователя
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -90,7 +90,7 @@ const WishlistTracker: React.FC = () => {
           ...docSnap.data(),
         })) as Category[];
 
-        // Falls keine Kategorien vorhanden sind, Standardkategorien erstellen
+        // Если категорий ещё нет, создать стандартные
         if (loadedCategories.length === 0) {
           loadedCategories = [
             { id: 'tech', name: 'Technology', userId: auth.currentUser?.uid || '' },
@@ -117,14 +117,14 @@ const WishlistTracker: React.FC = () => {
     fetchData();
   }, []);
 
-  // Standardkategorie setzen, falls noch nichts ausgewählt ist
+  // Если не выбрана категория, установить первую
   useEffect(() => {
     if (!itemCategory && categories.length > 0) {
       setItemCategory(categories[0].id);
     }
   }, [categories, itemCategory]);
 
-  // Neue Kategorie hinzufügen (mit userId)
+  // Функция добавления новой категории
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
     const categoryId = newCategory.toLowerCase().replace(/\s+/g, '-');
@@ -140,7 +140,17 @@ const WishlistTracker: React.FC = () => {
     setNewCategory('');
   };
 
-  // Formular zurücksetzen
+  // Функция удаления категории
+  const handleDeleteCategory = async (catId: string) => {
+    try {
+      await deleteDoc(doc(db, 'wishlist_categories', catId));
+      setCategories(prev => prev.filter(cat => cat.id !== catId));
+    } catch (err) {
+      console.error('Error deleting category:', err);
+    }
+  };
+
+  // Сброс формы
   const resetForm = () => {
     setItemName('');
     setItemDescription('');
@@ -149,12 +159,12 @@ const WishlistTracker: React.FC = () => {
     setItemUrl('');
     setItemCategory(categories[0]?.id || '');
     setItemTargetDate('');
-    setItemImage(undefined);
+    setItemImage('');
     setIsAdding(false);
     setEditingId(null);
   };
 
-  // Bild als Base64 laden
+  // Обработка загрузки картинки (конвертация в Base64)
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -167,9 +177,15 @@ const WishlistTracker: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Formular absenden: Neues Item anlegen oder vorhandenes aktualisieren (userId hinzufügen)
+  // Обработка отправки формы (создание/редактирование элемента)
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    // Проверяем обязательность цены и картинки
+    if (!itemPrice.trim() || !itemImage.trim()) {
+      alert('Пожалуйста, заполните обязательные поля: Price и Image.');
+      return;
+    }
+
     const newItemData: Omit<WishlistItem, 'id'> = {
       name: itemName,
       description: itemDescription,
@@ -204,7 +220,7 @@ const WishlistTracker: React.FC = () => {
     resetForm();
   };
 
-  // Bearbeitung starten
+  // Начало редактирования элемента
   const startEditing = (item: WishlistItem) => {
     setEditingId(item.id!);
     setItemName(item.name);
@@ -218,7 +234,7 @@ const WishlistTracker: React.FC = () => {
     setIsAdding(true);
   };
 
-  // Item löschen
+  // Удаление элемента wishlist
   const handleDeleteItem = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'wishlist', id));
@@ -239,7 +255,7 @@ const WishlistTracker: React.FC = () => {
         if (!Array.isArray(data.items) || !Array.isArray(data.categories)) {
           throw new Error('Invalid JSON format');
         }
-        // Kategorien importieren (mit userId)
+        // Импорт категорий (с userId)
         for (const cat of data.categories) {
           cat.userId = auth.currentUser?.uid || '';
           try {
@@ -248,7 +264,7 @@ const WishlistTracker: React.FC = () => {
             console.error('Error importing category:', err);
           }
         }
-        // Items importieren (mit userId)
+        // Импорт wishlist-элементов (с userId)
         for (const item of data.items) {
           item.userId = auth.currentUser?.uid || '';
           try {
@@ -257,7 +273,7 @@ const WishlistTracker: React.FC = () => {
             console.error('Error importing wishlist item:', err);
           }
         }
-        // Neu laden
+        // Перезагрузка данных
         const itemsSnap = await getDocs(collection(db, 'wishlist'));
         const loadedItems = itemsSnap.docs.map(docSnap => ({
           id: docSnap.id,
@@ -298,7 +314,7 @@ const WishlistTracker: React.FC = () => {
     }
   };
 
-  // Filter und Sortierung
+  // Фильтрация и сортировка
   const filteredItems = items.filter(item => filter === 'all' || item.category === filter);
   const sortedItems = [...filteredItems].sort((a, b) => {
     if (sortBy === 'date') {
@@ -337,7 +353,7 @@ const WishlistTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter und Sortierung */}
+      {/* Фильтр и сортировка */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-2">
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="bg-gray-700 text-white px-3 py-2 rounded">
@@ -357,7 +373,7 @@ const WishlistTracker: React.FC = () => {
         </button>
       </div>
 
-      {/* Formular für Hinzufügen/Bearbeiten */}
+      {/* Форма для добавления/редактирования */}
       {isAdding && (
         <div className="bg-gray-700 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
@@ -381,8 +397,8 @@ const WishlistTracker: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Price (€)</label>
-                <input type="text" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} placeholder="0.00" className="w-full bg-gray-800 text-white px-3 py-2 rounded" />
+                <label className="block text-sm font-medium mb-1">Price (€)*</label>
+                <input type="text" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required placeholder="0.00" className="w-full bg-gray-800 text-white px-3 py-2 rounded" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Priority</label>
@@ -401,8 +417,14 @@ const WishlistTracker: React.FC = () => {
                 <input type="date" value={itemTargetDate} onChange={(e) => setItemTargetDate(e.target.value)} className="w-full bg-gray-800 text-white px-3 py-2 rounded" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Upload Image</label>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500 mt-1" />
+                <label className="block text-sm font-medium mb-1">Upload Image* {editingId ? '(оставьте пустым если не менять)' : ''}</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500 mt-1"
+                  required={!editingId || (!editingId && !itemImage)}
+                />
               </div>
             </div>
             <div>
@@ -421,12 +443,17 @@ const WishlistTracker: React.FC = () => {
         </div>
       )}
 
-      {/* Kategorienverwaltung */}
+      {/* Управление категориями */}
       <div className="bg-gray-700 rounded-lg p-4">
         <h3 className="text-lg font-semibold mb-3">Manage Categories</h3>
         <div className="flex flex-wrap gap-2 mb-4">
           {categories.map(cat => (
-            <span key={cat.id} className="bg-gray-600 px-3 py-1 rounded">{cat.name}</span>
+            <div key={cat.id} className="flex items-center gap-2">
+              <span className="bg-gray-600 px-3 py-1 rounded">{cat.name}</span>
+              <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-400 hover:text-red-300">
+                <Trash2 size={16} />
+              </button>
+            </div>
           ))}
         </div>
         <div className="flex gap-2">
@@ -437,7 +464,7 @@ const WishlistTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Anzeige der Wishlist-Items */}
+      {/* Отображение wishlist-элементов */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sortedItems.length === 0 ? (
           <div className="col-span-full text-center py-8 bg-gray-700 rounded-lg">
