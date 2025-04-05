@@ -6,8 +6,6 @@ import {
   Brain,
   Plus,
   Calculator,
-  Download,
-  Upload,
   Gift
 } from 'lucide-react';
 
@@ -19,12 +17,18 @@ import TodoTracker from './components/trackers/TodoTracker';
 import HouseholdBudgetCalculator from './components/trackers/HouseholdBudgetCalculator';
 import WishlistTracker from './components/trackers/WishlistTracker';
 
+import ProfileSettings from './components/ProfileSettings'; // Ваш компонент с настройками профиля
 import AuthComponent from './components/AuthComponent';
-import { auth } from './firebaseConfig';
+import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
-import './App.css';
+// Пример: при желании можно добавить собственный Dashboard-компонент
+const Dashboard: React.FC = () => {
+  return <div className="text-white">Здесь контент вашей «Главной страницы» (Dashboard)</div>;
+};
 
+// Типы для вкладок (без Dashboard!)
 type TabId = 'projects' | 'goals' | 'mood' | 'lifeEQ' | 'todos' | 'budget' | 'wishlist';
 
 interface Tab {
@@ -33,34 +37,93 @@ interface Tab {
   Icon: React.FC<any>;
 }
 
-function useLocalStorage<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
-    } catch (error) {
-      console.error(error);
-      return initialValue;
-    }
-  });
+// Компонент выпадающего меню профиля
+const ProfileMenu: React.FC<{
+  onShowDashboard: () => void;
+  onShowProfileSettings: () => void;
+  onImportExport: () => void;
+}> = ({ onShowDashboard, onShowProfileSettings, onImportExport }) => {
+  const [open, setOpen] = useState(false);
+  const user = auth.currentUser;
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(error);
-    }
-  }, [key, storedValue]);
+  const toggleMenu = () => setOpen(!open);
 
-  return [storedValue, setStoredValue] as const;
-}
+  return (
+    <div className="relative">
+      {/* Кнопка с фото профиля (или инициалами) */}
+      <button
+        onClick={toggleMenu}
+        className="w-10 h-10 rounded-full overflow-hidden border border-gray-600"
+      >
+        {user?.photoURL ? (
+          <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-500 text-white">
+            {user?.displayName ? user.displayName[0] : 'U'}
+          </div>
+        )}
+      </button>
+
+      {/* Выпадающее меню */}
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+          <button
+            onClick={() => {
+              onShowDashboard();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => {
+              onShowProfileSettings();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Profile Settings
+          </button>
+          <button
+            onClick={() => {
+              onImportExport();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Import/Export
+          </button>
+          <button
+            onClick={() => {
+              signOut(auth);
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useLocalStorage<TabId>('activeTab', 'projects');
+
+  // Состояние для трекеров (какая вкладка активна)
+  const [activeTab, setActiveTab] = useState<TabId>('projects');
+
+  // Флаги для показа Dashboard и ProfileSettings
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+
+  // Открыто ли мобильное меню
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Синхронизация с Firebase Auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -68,6 +131,60 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Пример: загружаем из Firestore настройки пользователя (активная вкладка и т.п.)
+  useEffect(() => {
+    const fetchUserSettings = async () => {
+      if (user) {
+        const settingsRef = doc(db, 'userSettings', user.uid);
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (data.activeTab) {
+            setActiveTab(data.activeTab);
+          }
+          // Если хотите хранить showDashboard / showProfileSettings в Firestore, тоже можно
+        } else {
+          await setDoc(settingsRef, { activeTab: 'projects' });
+        }
+      }
+    };
+    fetchUserSettings();
+  }, [user]);
+
+  // При клике на вкладку убираем Dashboard/Settings
+  const handleTabClick = async (tabId: TabId) => {
+    setActiveTab(tabId);
+    setShowDashboard(false);
+    setShowProfileSettings(false);
+    setIsMobileMenuOpen(false);
+
+    if (user) {
+      const settingsRef = doc(db, 'userSettings', user.uid);
+      try {
+        await updateDoc(settingsRef, { activeTab: tabId });
+      } catch (error) {
+        console.error('Error updating user settings:', error);
+      }
+    }
+  };
+
+  // Показать Dashboard (из меню профиля)
+  const handleShowDashboard = () => {
+    setShowDashboard(true);
+    setShowProfileSettings(false);
+  };
+
+  // Показать ProfileSettings (из меню профиля)
+  const handleShowProfileSettings = () => {
+    setShowProfileSettings(true);
+    setShowDashboard(false);
+  };
+
+  // Пример Import/Export
+  const handleImportExport = () => {
+    alert('Здесь логика Import/Export');
+  };
 
   if (loading) {
     return (
@@ -79,6 +196,7 @@ const App: React.FC = () => {
 
   if (!user) return <AuthComponent />;
 
+  // Массив вкладок (без Dashboard)
   const tabs: Tab[] = [
     { id: 'projects', name: 'Project Tracker', Icon: Activity },
     { id: 'goals', name: 'Goals Tracker', Icon: Target },
@@ -89,62 +207,13 @@ const App: React.FC = () => {
     { id: 'wishlist', name: 'Wunschliste', Icon: Gift },
   ];
 
-  const handleTabClick = (tabId: TabId) => {
-    setActiveTab(tabId);
-    setIsMobileMenuOpen(false);
-  };
-
-  const exportAllProgress = () => {
-    const progressData = {
-      activeTab: localStorage.getItem('activeTab'),
-      projects: localStorage.getItem('projects'),
-      goals: localStorage.getItem('goals'),
-      mood: localStorage.getItem('mood'),
-      lifeEQ: localStorage.getItem('lifeEQ'),
-      todos: localStorage.getItem('todos'),
-      budget: localStorage.getItem('haushaltsrechner'),
-      wishlist: localStorage.getItem('wishlist')
-    };
-
-    const jsonData = JSON.stringify(progressData, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'life_tracker_progress.json';
-    link.click();
-  };
-
-  const importAllProgress = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const importedData = JSON.parse(e.target?.result as string);
-            Object.entries(importedData).forEach(([key, value]) => {
-              if (value) localStorage.setItem(key, value as string);
-            });
-            window.location.reload();
-          } catch (error) {
-            console.error('Fehler beim Import', error);
-            alert('Import fehlgeschlagen');
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-3 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <nav className="mb-4 sm:mb-6 md:mb-8 flex justify-between items-center">
+          {/* Левая часть – меню вкладок */}
           <div>
+            {/* Мобильное меню */}
             <div className="md:hidden mb-4">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -163,7 +232,9 @@ const App: React.FC = () => {
                   })()}
                 </div>
                 <svg
-                  className={`w-5 h-5 transition-transform duration-200 ${isMobileMenuOpen ? 'transform rotate-180' : ''}`}
+                  className={`w-5 h-5 transition-transform duration-200 ${
+                    isMobileMenuOpen ? 'transform rotate-180' : ''
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -177,7 +248,9 @@ const App: React.FC = () => {
                     <button
                       key={tab.id}
                       onClick={() => handleTabClick(tab.id)}
-                      className={`w-full flex items-center space-x-2 p-3 transition-colors ${activeTab === tab.id ? 'bg-blue-500' : 'hover:bg-gray-700'}`}
+                      className={`w-full flex items-center space-x-2 p-3 transition-colors ${
+                        activeTab === tab.id ? 'bg-blue-500' : 'hover:bg-gray-700'
+                      }`}
                     >
                       <tab.Icon className="w-5 h-5" />
                       <span>{tab.name}</span>
@@ -186,51 +259,50 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="hidden md:block">
-              <div className="flex flex-wrap gap-2 justify-center w-full bg-gray-800/50 p-3 sm:p-4 rounded-lg">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabClick(tab.id)}
-                    className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-300 ${activeTab === tab.id ? 'bg-blue-500 shadow-lg' : 'hover:bg-gray-700'}`}
-                  >
-                    <tab.Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="text-sm sm:text-base whitespace-nowrap">{tab.name}</span>
-                  </button>
-                ))}
-              </div>
+            {/* Десктопное меню */}
+            <div className="hidden md:flex flex-wrap gap-2 bg-gray-800/50 p-3 rounded-lg">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 ${
+                    activeTab === tab.id ? 'bg-blue-500 shadow-lg' : 'hover:bg-gray-700'
+                  }`}
+                >
+                  <tab.Icon className="w-4 h-4" />
+                  <span className="text-sm whitespace-nowrap">{tab.name}</span>
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Правая часть – меню профиля */}
           <div className="flex items-center space-x-3">
-            <button
-              onClick={exportAllProgress}
-              className="p-2 bg-green-500 rounded hover:bg-green-600 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              onClick={importAllProgress}
-              className="p-2 bg-purple-500 rounded hover:bg-purple-600 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => signOut(auth)}
-              className="p-2 bg-red-500 rounded hover:bg-red-600 transition-colors"
-            >
-              Logout
-            </button>
+            <ProfileMenu
+              onShowDashboard={handleShowDashboard}
+              onShowProfileSettings={handleShowProfileSettings}
+              onImportExport={handleImportExport}
+            />
           </div>
         </nav>
 
-        <div className="bg-gray-800/50 rounded-lg p-3 sm:p-4 md:p-6">
-          {activeTab === 'projects' && <ProjectTracker />}
-          {activeTab === 'goals' && <GoalsTracker />}
-          {activeTab === 'mood' && <MoodTracker />}
-          {activeTab === 'lifeEQ' && <LifeEQTracker />}
-          {activeTab === 'todos' && <TodoTracker />}
-          {activeTab === 'budget' && <HouseholdBudgetCalculator />}
-          {activeTab === 'wishlist' && <WishlistTracker />}
+        {/* Основная область контента */}
+        <div className="bg-gray-800/50 rounded-lg p-3 sm:p-4 md:p-6 min-h-[400px]">
+          {showProfileSettings ? (
+            <ProfileSettings />
+          ) : showDashboard ? (
+            <Dashboard />
+          ) : (
+            <>
+              {activeTab === 'projects' && <ProjectTracker />}
+              {activeTab === 'goals' && <GoalsTracker />}
+              {activeTab === 'mood' && <MoodTracker />}
+              {activeTab === 'lifeEQ' && <LifeEQTracker />}
+              {activeTab === 'todos' && <TodoTracker />}
+              {activeTab === 'budget' && <HouseholdBudgetCalculator />}
+              {activeTab === 'wishlist' && <WishlistTracker />}
+            </>
+          )}
         </div>
       </div>
     </div>
