@@ -10,7 +10,7 @@ import {
   Download,
   Upload,
 } from 'lucide-react';
-import { db } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 import {
   collection,
   getDocs,
@@ -18,6 +18,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  query,
+  where,
 } from 'firebase/firestore';
 
 interface WishlistItem {
@@ -31,11 +33,13 @@ interface WishlistItem {
   targetDate: string;
   createdAt: number;
   image?: string;
+  userId?: string;
 }
 
 interface Category {
   id: string;
   name: string;
+  userId?: string;
 }
 
 const WishlistTracker: React.FC = () => {
@@ -57,11 +61,15 @@ const WishlistTracker: React.FC = () => {
   const [itemTargetDate, setItemTargetDate] = useState('');
   const [itemImage, setItemImage] = useState<string | undefined>(undefined);
 
-  // Items und Kategorien aus Firestore laden
+  // Items und Kategorien aus Firestore laden (nur die des aktuellen Users)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const itemsSnap = await getDocs(collection(db, 'wishlist'));
+        const itemsQuery = query(
+          collection(db, 'wishlist'),
+          where('userId', '==', auth.currentUser?.uid || '')
+        );
+        const itemsSnap = await getDocs(itemsQuery);
         const loadedItems = itemsSnap.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data(),
@@ -72,7 +80,11 @@ const WishlistTracker: React.FC = () => {
         console.error('Error loading wishlist items:', err);
       }
       try {
-        const catsSnap = await getDocs(collection(db, 'wishlist_categories'));
+        const catsQuery = query(
+          collection(db, 'wishlist_categories'),
+          where('userId', '==', auth.currentUser?.uid || '')
+        );
+        const catsSnap = await getDocs(catsQuery);
         let loadedCategories = catsSnap.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data(),
@@ -81,11 +93,11 @@ const WishlistTracker: React.FC = () => {
         // Falls keine Kategorien vorhanden sind, Standardkategorien erstellen
         if (loadedCategories.length === 0) {
           loadedCategories = [
-            { id: 'tech', name: 'Technology' },
-            { id: 'kleidung', name: 'Clothing' },
-            { id: 'hobby', name: 'Hobby' },
-            { id: 'haushalt', name: 'Household' },
-            { id: 'sonstiges', name: 'Miscellaneous' },
+            { id: 'tech', name: 'Technology', userId: auth.currentUser?.uid || '' },
+            { id: 'kleidung', name: 'Clothing', userId: auth.currentUser?.uid || '' },
+            { id: 'hobby', name: 'Hobby', userId: auth.currentUser?.uid || '' },
+            { id: 'haushalt', name: 'Household', userId: auth.currentUser?.uid || '' },
+            { id: 'sonstiges', name: 'Miscellaneous', userId: auth.currentUser?.uid || '' },
           ];
           for (const cat of loadedCategories) {
             try {
@@ -112,12 +124,12 @@ const WishlistTracker: React.FC = () => {
     }
   }, [categories, itemCategory]);
 
-  // Neue Kategorie hinzufügen
+  // Neue Kategorie hinzufügen (mit userId)
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
     const categoryId = newCategory.toLowerCase().replace(/\s+/g, '-');
     if (!categories.find(cat => cat.id === categoryId)) {
-      const newCat: Category = { id: categoryId, name: newCategory };
+      const newCat: Category = { id: categoryId, name: newCategory, userId: auth.currentUser?.uid || '' };
       try {
         await addDoc(collection(db, 'wishlist_categories'), newCat);
         setCategories(prev => [...prev, newCat]);
@@ -155,10 +167,9 @@ const WishlistTracker: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Formular absenden: Neues Item anlegen oder vorhandenes aktualisieren
+  // Formular absenden: Neues Item anlegen oder vorhandenes aktualisieren (userId hinzufügen)
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Zum Hinzufügen soll _keine_ id gesendet werden – update schickt man über editingId
     const newItemData: Omit<WishlistItem, 'id'> = {
       name: itemName,
       description: itemDescription,
@@ -171,6 +182,7 @@ const WishlistTracker: React.FC = () => {
         ? items.find(i => i.id === editingId)?.createdAt || Date.now()
         : Date.now(),
       image: itemImage,
+      userId: auth.currentUser?.uid || '',
     };
 
     console.log('handleSubmit newItemData:', newItemData);
@@ -227,16 +239,18 @@ const WishlistTracker: React.FC = () => {
         if (!Array.isArray(data.items) || !Array.isArray(data.categories)) {
           throw new Error('Invalid JSON format');
         }
-        // Kategorien importieren
+        // Kategorien importieren (mit userId)
         for (const cat of data.categories) {
+          cat.userId = auth.currentUser?.uid || '';
           try {
             await addDoc(collection(db, 'wishlist_categories'), cat);
           } catch (err) {
             console.error('Error importing category:', err);
           }
         }
-        // Items importieren
+        // Items importieren (mit userId)
         for (const item of data.items) {
+          item.userId = auth.currentUser?.uid || '';
           try {
             await addDoc(collection(db, 'wishlist'), item);
           } catch (err) {

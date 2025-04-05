@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, Star, Archive } from 'lucide-react';
 import Note from '../shared/Note';
 import Milestone from '../shared/Milestone';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from './../../firebaseConfig'; // Pfad ggf. anpassen
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { db, auth } from './../../firebaseConfig'; // Stelle sicher, dass auth hier ebenfalls exportiert wird
 
 // Typdefinitionen – Firestore-Dokument-IDs als Strings
 interface MilestoneType {
@@ -20,6 +20,7 @@ interface NoteType {
 
 interface Goal {
   id: string;
+  userId: string; // neu hinzugefügt
   name: string;
   deadline: string;
   status: string;
@@ -71,11 +72,16 @@ const GoalTracker: React.FC = () => {
   const dragStartPosition = useRef({ x: 0, y: 0 });
   const [sortBy, setSortBy] = useState<SortOption>('default');
 
-  // Beim Mounten: Goals aus Firestore laden
+  // Beim Mounten: Goals aus Firestore laden, gefiltert nach dem aktuellen User
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "projectGoals"));
+        // Filtere nach userId, die dem aktuell angemeldeten Nutzer entspricht
+        const q = query(
+          collection(db, "projectGoals"),
+          where('userId', '==', auth.currentUser?.uid || '')
+        );
+        const querySnapshot = await getDocs(q);
         const fetchedGoals: Goal[] = [];
         querySnapshot.forEach((document) => {
           fetchedGoals.push({ id: document.id, ...document.data() } as Goal);
@@ -159,6 +165,7 @@ const GoalTracker: React.FC = () => {
 
   const addNewGoal = async () => {
     const newGoal = {
+      userId: auth.currentUser?.uid || '', // neu hinzugefügt
       name: 'New Goal',
       deadline: new Date().toISOString(),
       status: 'Not Started',

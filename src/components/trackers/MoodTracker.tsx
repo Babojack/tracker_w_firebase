@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Upload } from 'lucide-react';
 import Note from '../shared/Note';
-import { db } from '../../firebaseConfig';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 
 interface MoodEntry {
   id: string;
@@ -18,6 +18,7 @@ interface MoodEntry {
     text: string;
     timestamp: string;
   }[];
+  userId?: string;
 }
 
 const moodLevels = [
@@ -32,11 +33,15 @@ const MoodTracker: React.FC = () => {
   const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [filter, setFilter] = useState<string>('all');
 
-  // Beim Mounten: Einträge aus Firestore laden
+  // Beim Mounten: Einträge des aktuellen Users aus Firestore laden
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "moodEntries"));
+        const entriesQuery = query(
+          collection(db, "moodEntries"),
+          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
+        );
+        const querySnapshot = await getDocs(entriesQuery);
         const moodEntries: MoodEntry[] = [];
         querySnapshot.forEach((document) => {
           moodEntries.push({ id: document.id, ...document.data() } as MoodEntry);
@@ -50,16 +55,16 @@ const MoodTracker: React.FC = () => {
     fetchEntries();
   }, []);
 
-  // Neuen Eintrag in Firestore hinzufügen
+  // Neuen Eintrag in Firestore hinzufügen (mit userId)
   const addEntry = async (mood: typeof moodLevels[0]) => {
     try {
       const newEntry = {
         mood,
         timestamp: new Date().toISOString(),
-        notes: []
+        notes: [],
+        userId: auth.currentUser ? auth.currentUser.uid : null,
       };
       const docRef = await addDoc(collection(db, "moodEntries"), newEntry);
-      // Aktualisiere den lokalen State
       setEntries([{ id: docRef.id, ...newEntry } as MoodEntry, ...entries]);
     } catch (error) {
       console.error("Fehler beim Hinzufügen des Eintrags:", error);
@@ -69,7 +74,6 @@ const MoodTracker: React.FC = () => {
   // Notiz hinzufügen und Firestore updaten
   const addNote = async (entryId: string, noteText: string) => {
     if (noteText.trim()) {
-      // Lokale Aktualisierung: Füge die neue Notiz hinzu
       const updatedEntries = entries.map(entry => {
         if (entry.id === entryId) {
           const newNote = {
@@ -83,7 +87,6 @@ const MoodTracker: React.FC = () => {
       });
       setEntries(updatedEntries);
 
-      // Aktualisiere Firestore
       try {
         const entryRef = doc(db, "moodEntries", entryId);
         const entryToUpdate = updatedEntries.find(e => e.id === entryId);
@@ -96,7 +99,7 @@ const MoodTracker: React.FC = () => {
     }
   };
 
-  // Eintrag löschen (sowohl lokal als auch in Firestore)
+  // Eintrag löschen (lokal und in Firestore)
   const deleteEntry = async (entryId: string) => {
     try {
       await deleteDoc(doc(db, "moodEntries", entryId));
@@ -128,7 +131,6 @@ const MoodTracker: React.FC = () => {
               </option>
             ))}
           </select>
-          {/* Export-Button – kannst du zunächst beibehalten, um die lokalen Einträge als JSON zu exportieren */}
           <div className="flex space-x-2">
             <button
               onClick={() => console.log("Export funktioniert hier noch nur lokal!")}
@@ -210,7 +212,6 @@ const MoodTracker: React.FC = () => {
                   key={note.id}
                   note={note}
                   onDelete={() => {
-                    // Hier könntest du auch eine Funktion ergänzen, um die Notiz in Firestore zu entfernen.
                     const updatedEntries = entries.map(e => ({
                       ...e,
                       notes: e.id === entry.id
@@ -218,7 +219,6 @@ const MoodTracker: React.FC = () => {
                         : e.notes
                     }));
                     setEntries(updatedEntries);
-                    // Und dann Firestore updaten, ähnlich wie in addNote.
                   }}
                 />
               ))}
@@ -227,7 +227,6 @@ const MoodTracker: React.FC = () => {
         ))}
       </div>
 
-      {/* Hinweis, falls keine Einträge vorhanden sind */}
       {filteredEntries.length === 0 && (
         <div className="text-center py-8 text-gray-400">
           <p className="text-lg">No mood entries yet.</p>

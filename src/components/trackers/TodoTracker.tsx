@@ -10,8 +10,8 @@ import {
   Archive,
   ArchiveRestore
 } from 'lucide-react';
-import { db } from '../../firebaseConfig';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 
 type PriorityLevel = 'high' | 'medium' | 'low' | 'none';
 
@@ -34,6 +34,7 @@ interface TodoGroup {
   id: string;
   title: string;
   todos: Todo[];
+  userId?: string;
 }
 
 interface FilterOptions {
@@ -55,11 +56,15 @@ const TodoTracker: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Beim Mounten: Todo-Gruppen aus Firestore laden
+  // Beim Mounten: Todo-Gruppen des aktuell angemeldeten Users aus Firestore laden
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "todoGroups"));
+        const q = query(
+          collection(db, "todoGroups"),
+          where("userId", "==", auth.currentUser?.uid || "")
+        );
+        const querySnapshot = await getDocs(q);
         const groups: TodoGroup[] = [];
         querySnapshot.forEach((document) => {
           groups.push({ id: document.id, ...document.data() } as TodoGroup);
@@ -104,7 +109,8 @@ const TodoTracker: React.FC = () => {
         month: 'long',
         day: 'numeric'
       }),
-      todos: []
+      todos: [],
+      userId: auth.currentUser?.uid || ''
     };
     try {
       const docRef = await addDoc(collection(db, "todoGroups"), newGroup);

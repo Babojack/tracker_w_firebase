@@ -46,10 +46,11 @@ const AuthComponent: React.FC = () => {
           formData.email,
           formData.password
         );
-        // Update profile with first and last name
-        await updateProfile(userCredential.user, {
-          displayName: `${formData.firstName} ${formData.lastName}`,
-        });
+        if (userCredential.user) { // Проверка на null
+          await updateProfile(userCredential.user, {
+            displayName: `${formData.firstName} ${formData.lastName}`,
+          });
+        }
       } catch (err: any) {
         setError(err.message);
       }

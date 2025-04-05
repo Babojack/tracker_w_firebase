@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, Star, Archive } from 'lucide-react';
 import Note from '../shared/Note';
 import Milestone from '../shared/Milestone';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '././../../firebaseConfig'; // Pfad ggf. anpassen
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { db, auth } from './../../firebaseConfig'; // Stelle sicher, dass auth hier ebenfalls exportiert wird
 
 // Da Firestore IDs als Strings zurückgibt, passen wir den Typ an:
 interface Goal {
@@ -26,6 +26,7 @@ interface Goal {
   order: number;
   archived: boolean;
   favorite: boolean;
+  userId?: string;
 }
 
 interface DifficultyIndicatorProps {
@@ -70,11 +71,15 @@ const ProjectTracker: React.FC = () => {
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
   const dragStartPosition = useRef({ x: 0, y: 0 });
 
-  // Beim Mounten: Goals aus Firestore laden
+  // Beim Mounten: Goals aus Firestore laden (nur die des aktuellen Users)
   useEffect(() => {
     const fetchGoals = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "projectTrackerGoals"));
+        const q = query(
+          collection(db, "projectTrackerGoals"),
+          where('userId', '==', auth.currentUser?.uid || '')
+        );
+        const querySnapshot = await getDocs(q);
         const fetchedGoals: Goal[] = [];
         querySnapshot.forEach(document => {
           fetchedGoals.push({ id: document.id, ...document.data() } as Goal);
@@ -159,7 +164,8 @@ const ProjectTracker: React.FC = () => {
       notes: [],
       order: goals.length + 1,
       archived: false,
-      favorite: false
+      favorite: false,
+      userId: auth.currentUser ? auth.currentUser.uid : ''
     };
     try {
       const docRef = await addDoc(collection(db, "projectTrackerGoals"), newGoal);

@@ -6,8 +6,10 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  query,
+  where,
 } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 
 // --------------------------------------------------------
 //    1. Typen und Interfaces
@@ -16,6 +18,7 @@ interface FinancialEntry {
   category: string;
   amount: string;
   purpose: string;
+  userId?: string;
 }
 
 interface BudgetData {
@@ -93,14 +96,23 @@ const HouseholdBudgetCalculator: React.FC = () => {
     setTimeout(() => setNotification({ message: '', type: 'success' }), 3000);
   };
 
-  // Daten aus Firestore laden
+  // Daten aus Firestore laden (nur Dokumente des aktuellen Users)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const incomesSnap = await getDocs(collection(db, 'incomes'));
+        const incomesQuery = query(
+          collection(db, 'incomes'),
+          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
+        );
+        const incomesSnap = await getDocs(incomesQuery);
         let loadedIncomes = incomesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
         if (loadedIncomes.length === 0) {
-          const defaultIncomes = defaultIncomeCategories.map(category => ({ category, amount: '0', purpose: '' }));
+          const defaultIncomes = defaultIncomeCategories.map(category => ({
+            category,
+            amount: '0',
+            purpose: '',
+            userId: auth.currentUser ? auth.currentUser.uid : '',
+          }));
           for (const income of defaultIncomes) {
             const docRef = await addDoc(collection(db, 'incomes'), income);
             loadedIncomes.push({ id: docRef.id, ...income });
@@ -112,10 +124,19 @@ const HouseholdBudgetCalculator: React.FC = () => {
       }
 
       try {
-        const expensesSnap = await getDocs(collection(db, 'expenses'));
+        const expensesQuery = query(
+          collection(db, 'expenses'),
+          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
+        );
+        const expensesSnap = await getDocs(expensesQuery);
         let loadedExpenses = expensesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
         if (loadedExpenses.length === 0) {
-          const defaultExpenses = defaultExpenseCategories.map(category => ({ category, amount: '0', purpose: '' }));
+          const defaultExpenses = defaultExpenseCategories.map(category => ({
+            category,
+            amount: '0',
+            purpose: '',
+            userId: auth.currentUser ? auth.currentUser.uid : '',
+          }));
           for (const expense of defaultExpenses) {
             const docRef = await addDoc(collection(db, 'expenses'), expense);
             loadedExpenses.push({ id: docRef.id, ...expense });
@@ -160,7 +181,12 @@ const HouseholdBudgetCalculator: React.FC = () => {
   // Neue Zeile hinzufügen
   const addIncomeRow = async () => {
     try {
-      const newIncome: FinancialEntry = { category: 'New Income', amount: '0', purpose: '' };
+      const newIncome: FinancialEntry = {
+        category: 'New Income',
+        amount: '0',
+        purpose: '',
+        userId: auth.currentUser ? auth.currentUser.uid : '',
+      };
       const docRef = await addDoc(collection(db, 'incomes'), newIncome);
       setIncomes(prev => [...prev, { id: docRef.id, ...newIncome }]);
     } catch (error) {
@@ -170,7 +196,12 @@ const HouseholdBudgetCalculator: React.FC = () => {
 
   const addExpenseRow = async () => {
     try {
-      const newExpense: FinancialEntry = { category: 'New Expense', amount: '0', purpose: '' };
+      const newExpense: FinancialEntry = {
+        category: 'New Expense',
+        amount: '0',
+        purpose: '',
+        userId: auth.currentUser ? auth.currentUser.uid : '',
+      };
       const docRef = await addDoc(collection(db, 'expenses'), newExpense);
       setExpenses(prev => [...prev, { id: docRef.id, ...newExpense }]);
     } catch (error) {
@@ -213,7 +244,12 @@ const HouseholdBudgetCalculator: React.FC = () => {
       }
       showNotification('Data reset.', 'success');
 
-      const defaultIncomes = defaultIncomeCategories.map(category => ({ category, amount: '0', purpose: '' }));
+      const defaultIncomes = defaultIncomeCategories.map(category => ({
+        category,
+        amount: '0',
+        purpose: '',
+        userId: auth.currentUser ? auth.currentUser.uid : '',
+      }));
       const newIncomes: (FinancialEntry & { id: string })[] = [];
       for (const income of defaultIncomes) {
         const docRef = await addDoc(collection(db, 'incomes'), income);
@@ -221,7 +257,12 @@ const HouseholdBudgetCalculator: React.FC = () => {
       }
       setIncomes(newIncomes);
 
-      const defaultExpenses = defaultExpenseCategories.map(category => ({ category, amount: '0', purpose: '' }));
+      const defaultExpenses = defaultExpenseCategories.map(category => ({
+        category,
+        amount: '0',
+        purpose: '',
+        userId: auth.currentUser ? auth.currentUser.uid : '',
+      }));
       const newExpenses: (FinancialEntry & { id: string })[] = [];
       for (const expense of defaultExpenses) {
         const docRef = await addDoc(collection(db, 'expenses'), expense);
