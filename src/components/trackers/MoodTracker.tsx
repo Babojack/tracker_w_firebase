@@ -21,7 +21,9 @@ interface MoodEntry {
   userId?: string;
 }
 
+// Updated moodLevels array including the new "Pattern" icon for pattern tracking
 const moodLevels = [
+  { id: 6, label: 'Pattern', color: 'bg-purple-500', emoji: '🌀' },
   { id: 5, label: 'Excellent', color: 'bg-green-500', emoji: '😃' },
   { id: 4, label: 'Good', color: 'bg-blue-500', emoji: '🙂' },
   { id: 3, label: 'Neutral', color: 'bg-yellow-500', emoji: '😐' },
@@ -33,7 +35,7 @@ const MoodTracker: React.FC = () => {
   const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [filter, setFilter] = useState<string>('all');
 
-  // Beim Mounten: Einträge des aktuellen Users aus Firestore laden
+  // Fetch entries for the current user from Firestore on mount
   useEffect(() => {
     const fetchEntries = async () => {
       try {
@@ -55,7 +57,7 @@ const MoodTracker: React.FC = () => {
     fetchEntries();
   }, []);
 
-  // Neuen Eintrag in Firestore hinzufügen (mit userId)
+  // Add new entry to Firestore (with userId)
   const addEntry = async (mood: typeof moodLevels[0]) => {
     try {
       const newEntry = {
@@ -71,7 +73,7 @@ const MoodTracker: React.FC = () => {
     }
   };
 
-  // Notiz hinzufügen und Firestore updaten
+  // Add note and update Firestore
   const addNote = async (entryId: string, noteText: string) => {
     if (noteText.trim()) {
       const updatedEntries = entries.map(entry => {
@@ -99,7 +101,7 @@ const MoodTracker: React.FC = () => {
     }
   };
 
-  // Eintrag löschen (lokal und in Firestore)
+  // Delete entry (locally and in Firestore)
   const deleteEntry = async (entryId: string) => {
     try {
       await deleteDoc(doc(db, "moodEntries", entryId));
@@ -115,7 +117,7 @@ const MoodTracker: React.FC = () => {
 
   return (
     <div className="w-full space-y-6 p-4">
-      {/* Überschrift und Filter */}
+      {/* Header and Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl sm:text-2xl font-bold">Mood Tracker</h2>
         <div className="flex items-center space-x-2">
@@ -143,7 +145,7 @@ const MoodTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Mood-Buttons */}
+      {/* Mood Buttons */}
       <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2 sm:gap-4">
         {moodLevels.map(mood => (
           <button
@@ -160,7 +162,7 @@ const MoodTracker: React.FC = () => {
         ))}
       </div>
 
-      {/* Mood-Einträge */}
+      {/* Mood Entries */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredEntries.map(entry => (
           <div
@@ -190,7 +192,7 @@ const MoodTracker: React.FC = () => {
               </div>
             </div>
 
-            {/* Eingabe für Notizen */}
+            {/* Note Input */}
             <input
               type="text"
               placeholder="Add a note and press Enter..."
@@ -205,7 +207,7 @@ const MoodTracker: React.FC = () => {
               }}
             />
 
-            {/* Liste der Notizen */}
+            {/* List of Notes */}
             <div className="space-y-2 mt-2">
               {entry.notes && entry.notes.map(note => (
                 <Note
