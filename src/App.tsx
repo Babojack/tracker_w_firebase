@@ -27,7 +27,16 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 
-type TabId = 'dashboard' | 'projects' | 'goals' | 'mood' | 'lifeEQ' | 'todos' | 'budget' | 'wishlist' | 'travel';
+type TabId =
+  | 'dashboard'
+  | 'projects'
+  | 'goals'
+  | 'mood'
+  | 'lifeEQ'
+  | 'todos'
+  | 'budget'
+  | 'wishlist'
+  | 'travel';
 
 interface Tab {
   id: TabId;
@@ -35,6 +44,7 @@ interface Tab {
   Icon: React.FC<any>;
 }
 
+// Profilmenü als eigenen Component
 const ProfileMenu: React.FC<{
   onShowDashboard: () => void;
   onShowProfileSettings: () => void;
@@ -62,10 +72,42 @@ const ProfileMenu: React.FC<{
 
       {open && (
         <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
-          <button onClick={() => { onShowDashboard(); setOpen(false); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">Dashboard</button>
-          <button onClick={() => { onShowProfileSettings(); setOpen(false); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">Profile Settings</button>
-          <button onClick={() => { onImportExport(); setOpen(false); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">Import/Export</button>
-          <button onClick={() => { signOut(auth); setOpen(false); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">Logout</button>
+          <button
+            onClick={() => {
+              onShowDashboard();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => {
+              onShowProfileSettings();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Profile Settings
+          </button>
+          <button
+            onClick={() => {
+              onImportExport();
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Import/Export
+          </button>
+          <button
+            onClick={() => {
+              signOut(auth);
+              setOpen(false);
+            }}
+            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700"
+          >
+            Logout
+          </button>
         </div>
       )}
     </div>
@@ -93,7 +135,20 @@ const App: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    if (tabParam && ['dashboard', 'projects', 'goals', 'mood', 'lifeEQ', 'todos', 'budget', 'wishlist', 'travel'].includes(tabParam)) {
+    if (
+      tabParam &&
+      [
+        'dashboard',
+        'projects',
+        'goals',
+        'mood',
+        'lifeEQ',
+        'todos',
+        'budget',
+        'wishlist',
+        'travel',
+      ].includes(tabParam)
+    ) {
       setActiveTab(tabParam as TabId);
       setShowProfileSettings(false);
     }
@@ -155,6 +210,7 @@ const App: React.FC = () => {
 
   if (!user) return <AuthComponent />;
 
+  // Liste aller Tabs
   const tabs: Tab[] = [
     { id: 'dashboard', name: 'Dashboard', Icon: BarChart2 },
     { id: 'projects', name: 'Project Tracker', Icon: Activity },
@@ -170,63 +226,83 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-3 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <nav className="mb-4 sm:mb-6 md:mb-8 flex justify-between items-center">
-          <div>
-            <div className="md:hidden mb-4">
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="w-full bg-gray-800/50 p-3 rounded-lg flex items-center justify-between"
+        <nav className="mb-4 sm:mb-6 md:mb-8">
+          {/* ========== MOBILES MENÜ ========== */}
+          <div className="md:hidden mb-4">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="w-full bg-gray-800/50 p-3 rounded-lg flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-2">
+                {(() => {
+                  const activeTabData = tabs.find((tab) => tab.id === activeTab);
+                  const IconComponent = activeTabData?.Icon;
+                  return (
+                    <>
+                      {IconComponent && <IconComponent className="w-5 h-5" />}
+                      <span>{activeTabData?.name}</span>
+                    </>
+                  );
+                })()}
+              </div>
+              <svg
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  isMobileMenuOpen ? 'transform rotate-180' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <div className="flex items-center space-x-2">
-                  {(() => {
-                    const activeTabData = tabs.find(tab => tab.id === activeTab);
-                    const IconComponent = activeTabData?.Icon;
-                    return (
-                      <>
-                        {IconComponent && <IconComponent className="w-5 h-5" />}
-                        <span>{activeTabData?.name}</span>
-                      </>
-                    );
-                  })()}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isMobileMenuOpen && (
+              <div className="mt-2 bg-gray-800/50 rounded-lg overflow-hidden">
+                {/* Tabs-Liste im mobilen Menü */}
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabClick(tab.id)}
+                    className={`w-full flex items-center space-x-2 p-3 transition-colors ${
+                      activeTab === tab.id ? 'bg-blue-500' : 'hover:bg-gray-700'
+                    }`}
+                  >
+                    <tab.Icon className="w-5 h-5" />
+                    <span>{tab.name}</span>
+                  </button>
+                ))}
+
+                {/* Profilbild/Profil-Menü im mobilen Menü */}
+                <div className="flex justify-end p-2 border-t border-gray-700">
+                  <ProfileMenu
+                    onShowDashboard={handleShowDashboard}
+                    onShowProfileSettings={handleShowProfileSettings}
+                    onImportExport={handleImportExport}
+                  />
                 </div>
-                <svg
-                  className={`w-5 h-5 transition-transform duration-200 ${isMobileMenuOpen ? 'transform rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {isMobileMenuOpen && (
-                <div className="mt-2 bg-gray-800/50 rounded-lg overflow-hidden">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabClick(tab.id)}
-                      className={`w-full flex items-center space-x-2 p-3 transition-colors ${activeTab === tab.id ? 'bg-blue-500' : 'hover:bg-gray-700'}`}
-                    >
-                      <tab.Icon className="w-5 h-5" />
-                      <span>{tab.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="hidden md:flex flex-wrap gap-2 bg-gray-800/50 p-3 rounded-lg">
+              </div>
+            )}
+          </div>
+
+          {/* ========== DESKTOP MENÜ ========== */}
+          <div className="hidden md:flex items-center justify-between bg-gray-800/50 p-3 rounded-lg">
+            {/* Links: Tabs */}
+            <div className="flex flex-wrap gap-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 ${activeTab === tab.id ? 'bg-blue-500 shadow-lg' : 'hover:bg-gray-700'}`}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 ${
+                    activeTab === tab.id ? 'bg-blue-500 shadow-lg' : 'hover:bg-gray-700'
+                  }`}
                 >
                   <tab.Icon className="w-4 h-4" />
                   <span className="text-sm whitespace-nowrap">{tab.name}</span>
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex items-center space-x-3">
+
+            {/* Rechts: Profil-Menü */}
             <ProfileMenu
               onShowDashboard={handleShowDashboard}
               onShowProfileSettings={handleShowProfileSettings}
@@ -234,6 +310,8 @@ const App: React.FC = () => {
             />
           </div>
         </nav>
+
+        {/* ========== HAUPTBEREICH ========== */}
         <div className="bg-gray-800/50 rounded-lg p-3 sm:p-4 md:p-6 min-h-[400px]">
           {showProfileSettings ? (
             <ProfileSettings />
