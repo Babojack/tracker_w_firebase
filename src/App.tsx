@@ -7,7 +7,8 @@ import {
   Brain,
   Plus,
   Calculator,
-  Gift
+  Gift,
+  Airplay,
 } from 'lucide-react';
 
 import ProjectTracker from './components/trackers/ProjectTracker';
@@ -17,6 +18,7 @@ import LifeEQTracker from './components/trackers/LifeEQTracker';
 import TodoTracker from './components/trackers/TodoTracker';
 import HouseholdBudgetCalculator from './components/trackers/HouseholdBudgetCalculator';
 import WishlistTracker from './components/trackers/WishlistTracker';
+import TravelPlanner from './components/trackers/TravelPlanner';
 
 import ProfileSettings from './components/ProfileSettings';
 import AuthComponent from './components/AuthComponent';
@@ -25,7 +27,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 
-type TabId = 'dashboard' | 'projects' | 'goals' | 'mood' | 'lifeEQ' | 'todos' | 'budget' | 'wishlist';
+type TabId = 'dashboard' | 'projects' | 'goals' | 'mood' | 'lifeEQ' | 'todos' | 'budget' | 'wishlist' | 'travel';
 
 interface Tab {
   id: TabId;
@@ -91,7 +93,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    if (tabParam && ['dashboard', 'projects', 'goals', 'mood', 'lifeEQ', 'todos', 'budget', 'wishlist'].includes(tabParam)) {
+    if (tabParam && ['dashboard', 'projects', 'goals', 'mood', 'lifeEQ', 'todos', 'budget', 'wishlist', 'travel'].includes(tabParam)) {
       setActiveTab(tabParam as TabId);
       setShowProfileSettings(false);
     }
@@ -140,7 +142,7 @@ const App: React.FC = () => {
   };
 
   const handleImportExport = () => {
-    alert('Здесь логика Import/Export');
+    alert('Import/Export logic goes here');
   };
 
   if (loading) {
@@ -161,7 +163,8 @@ const App: React.FC = () => {
     { id: 'lifeEQ', name: 'LifeEQ Tracker', Icon: Brain },
     { id: 'todos', name: "ToDo's", Icon: Plus },
     { id: 'budget', name: 'Household Budget', Icon: Calculator },
-    { id: 'wishlist', name: 'Wunschliste', Icon: Gift },
+    { id: 'wishlist', name: 'Wishlist', Icon: Gift },
+    { id: 'travel', name: 'Travel Planner', Icon: Airplay },
   ];
 
   return (
@@ -244,6 +247,7 @@ const App: React.FC = () => {
               {activeTab === 'todos' && <TodoTracker />}
               {activeTab === 'budget' && <HouseholdBudgetCalculator />}
               {activeTab === 'wishlist' && <WishlistTracker />}
+              {activeTab === 'travel' && <TravelPlanner />}
             </>
           )}
         </div>
