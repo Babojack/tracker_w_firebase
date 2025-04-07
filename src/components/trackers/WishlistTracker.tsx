@@ -15,7 +15,6 @@ import {
   collection,
   getDocs,
   addDoc,
-  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -24,10 +23,10 @@ import {
 } from 'firebase/firestore';
 
 interface WishlistItem {
-  id: string;  // всегда хранить реальный ID (от Firestore)
+  id: string; // Firestore document ID
   name: string;
   description: string;
-  priority: 'niedrig' | 'mittel' | 'hoch';
+  priority: 'low' | 'medium' | 'high';
   price: string;
   url: string;
   category: string;
@@ -38,31 +37,44 @@ interface WishlistItem {
 }
 
 interface Category {
-  id: string;  // Firestore ID
+  id: string; // Category ID
   name: string;
   userId: string;
 }
 
+// Predefined 15 categories in English (userId is left empty since categories are static)
+const PREDEFINED_CATEGORIES: Category[] = [
+  { id: 'tech', name: 'Technology', userId: '' },
+  { id: 'clothing', name: 'Clothing', userId: '' },
+  { id: 'books', name: 'Books', userId: '' },
+  { id: 'electronics', name: 'Electronics', userId: '' },
+  { id: 'furniture', name: 'Furniture', userId: '' },
+  { id: 'beauty', name: 'Beauty', userId: '' },
+  { id: 'sports', name: 'Sports', userId: '' },
+  { id: 'toys', name: 'Toys', userId: '' },
+  { id: 'games', name: 'Games', userId: '' },
+  { id: 'grocery', name: 'Grocery', userId: '' },
+  { id: 'automotive', name: 'Automotive', userId: '' },
+  { id: 'health', name: 'Health', userId: '' },
+  { id: 'outdoors', name: 'Outdoors', userId: '' },
+  { id: 'office', name: 'Office', userId: '' },
+  { id: 'other', name: 'Other', userId: '' },
+];
+
 const WishlistTracker: React.FC = () => {
   // =================== STATE ===================
   const [items, setItems] = useState<WishlistItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  // Состояние для управления новым вводом категории
-  const [newCategory, setNewCategory] = useState('');
-
-  // Фильтрация / сортировка
+  // Use the predefined categories – no adding or deleting allowed
+  const [categories] = useState<Category[]>(PREDEFINED_CATEGORIES);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
 
-  // Форма добавления/редактирования
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Поля формы
   const [itemName, setItemName] = useState('');
   const [itemDescription, setItemDescription] = useState('');
-  const [itemPriority, setItemPriority] = useState<'niedrig' | 'mittel' | 'hoch'>('mittel');
+  const [itemPriority, setItemPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [itemPrice, setItemPrice] = useState('');
   const [itemUrl, setItemUrl] = useState('');
   const [itemCategory, setItemCategory] = useState('');
@@ -70,8 +82,7 @@ const WishlistTracker: React.FC = () => {
   const [itemImage, setItemImage] = useState('');
 
   // =================== DATA LOADING ===================
-
-  // Загрузка wishlist items
+  // Fetch wishlist items from Firestore (global collection filtered by userId)
   const fetchWishlistItems = async (uid: string) => {
     try {
       const itemsQuery = query(collection(db, 'wishlist'), where('userId', '==', uid));
@@ -87,112 +98,23 @@ const WishlistTracker: React.FC = () => {
     }
   };
 
-  // Загрузка категорий (если нет — создаём дефолтные)
-  const fetchWishlistCategories = async (uid: string) => {
-    try {
-      const catsQuery = query(collection(db, 'wishlist_categories'), where('userId', '==', uid));
-      const catsSnap = await getDocs(catsQuery);
-
-      let loadedCategories: Category[] = catsSnap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<Category, 'id'>),
-      }));
-
-      // Если нет ни одной категории, создаём дефолтные
-      if (loadedCategories.length === 0) {
-        loadedCategories = [
-          { id: 'tech',      name: 'Technology',   userId: uid },
-          { id: 'kleidung',  name: 'Clothing',     userId: uid },
-          { id: 'hobby',     name: 'Hobby',        userId: uid },
-          { id: 'haushalt',  name: 'Household',    userId: uid },
-          { id: 'sonstiges', name: 'Miscellaneous', userId: uid },
-        ];
-        for (const cat of loadedCategories) {
-          // Воспользуемся setDoc, чтобы ID совпадал с cat.id
-          await setDoc(doc(db, 'wishlist_categories', cat.id), cat);
-        }
-      }
-
-      setCategories(loadedCategories);
-      console.log('Loaded wishlist categories:', loadedCategories);
-    } catch (err) {
-      console.error('Error loading wishlist categories:', err);
-    }
-  };
-
-  // Начальная загрузка данных
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-
-    // Загружаем всё параллельно
-    fetchWishlistItems(uid);
-    fetchWishlistCategories(uid);
-  }, []);
-
-  // Если не выбрана категория, то устанавливаем первую из списка
-  useEffect(() => {
+    // Set default category to the first predefined category if not already set
     if (!itemCategory && categories.length > 0) {
       setItemCategory(categories[0].id);
     }
-  }, [categories, itemCategory]);
-
-  // =================== CATEGORY OPERATIONS ===================
-
-  // Добавить новую категорию
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) return;
-
-    // Используем id = userInput.toLowerCase()...
-    const categoryId = newCategory.toLowerCase().replace(/\s+/g, '-');
-
-    // Проверим, нет ли уже такой в локальном состоянии
-    const existing = categories.find(cat => cat.id === categoryId);
-    if (existing) {
-      console.log('Category already exists:', existing);
-      setNewCategory('');
-      return;
-    }
-
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-
-    // Создаём объект категории
-    const newCat: Category = {
-      id: categoryId,
-      name: newCategory,
-      userId: uid,
-    };
-
-    // Пишем в Firestore конкретным id (используя setDoc)
-    try {
-      await setDoc(doc(db, 'wishlist_categories', categoryId), newCat);
-      // Добавляем в локальное состояние
-      setCategories(prev => [...prev, newCat]);
-      setNewCategory('');
-    } catch (err) {
-      console.error('Error adding new category:', err);
-    }
-  };
-
-  // Удалить категорию
-  const handleDeleteCategory = async (catId: string) => {
-    try {
-      await deleteDoc(doc(db, 'wishlist_categories', catId));
-      setCategories(prev => prev.filter(cat => cat.id !== catId));
-      console.log('Category deleted:', catId);
-    } catch (err) {
-      console.error('Error deleting category:', err);
-    }
-  };
+    fetchWishlistItems(uid);
+  }, [itemCategory, categories]);
 
   // =================== WISHLIST FORM (CREATE/UPDATE) ===================
 
-  // Сброс формы
+  // Reset form fields
   const resetForm = () => {
     setItemName('');
     setItemDescription('');
-    setItemPriority('mittel');
+    setItemPriority('medium');
     setItemPrice('');
     setItemUrl('');
     setItemCategory(categories[0]?.id || '');
@@ -202,7 +124,7 @@ const WishlistTracker: React.FC = () => {
     setEditingId(null);
   };
 
-  // Загрузка картинки (Base64)
+  // Handle image upload (Base64)
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -215,11 +137,10 @@ const WishlistTracker: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Отправка формы
+  // Submit form to create or update a wishlist item
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Обязательные поля
     if (!itemPrice.trim() || !itemImage.trim()) {
       alert('Please fill required fields: Price and Image.');
       return;
@@ -231,7 +152,6 @@ const WishlistTracker: React.FC = () => {
       return;
     }
 
-    // Формируем данные (без id, так как Firestore его даст)
     const newItemData = {
       name: itemName,
       description: itemDescription,
@@ -251,13 +171,11 @@ const WishlistTracker: React.FC = () => {
 
     try {
       if (editingId) {
-        // UPDATE
         await updateDoc(doc(db, 'wishlist', editingId), newItemData);
         setItems((prev) =>
           prev.map((item) => (item.id === editingId ? { id: editingId, ...newItemData } : item))
         );
       } else {
-        // CREATE
         const docRef = await addDoc(collection(db, 'wishlist'), newItemData);
         setItems((prev) => [...prev, { id: docRef.id, ...newItemData }]);
       }
@@ -268,7 +186,7 @@ const WishlistTracker: React.FC = () => {
     resetForm();
   };
 
-  // Начать редактирование
+  // Start editing a wishlist item
   const startEditing = (item: WishlistItem) => {
     setEditingId(item.id);
     setItemName(item.name);
@@ -282,7 +200,7 @@ const WishlistTracker: React.FC = () => {
     setIsAdding(true);
   };
 
-  // Удалить item
+  // Delete a wishlist item
   const handleDeleteItem = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'wishlist', id));
@@ -302,7 +220,7 @@ const WishlistTracker: React.FC = () => {
     reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result as string);
-        if (!Array.isArray(data.items) || !Array.isArray(data.categories)) {
+        if (!Array.isArray(data.items)) {
           throw new Error('Invalid JSON format');
         }
         const uid = auth.currentUser?.uid;
@@ -311,31 +229,16 @@ const WishlistTracker: React.FC = () => {
           return;
         }
 
-        // Импорт категорий
-        for (const rawCat of data.categories) {
-          const catWithUid: Omit<Category, 'id'> = {
-            ...rawCat,
-            userId: uid,
-          };
-          // Если хотим, чтобы id совпадал, используем setDoc + rawCat.id
-          const catDocRef = doc(db, 'wishlist_categories', rawCat.id || 'temp');
-          await setDoc(catDocRef, catWithUid, { merge: true });
-        }
-
-        // Импорт wishlist items
+        // Import wishlist items into the global collection
         for (const rawItem of data.items) {
           const itemWithUid: Omit<WishlistItem, 'id'> = {
             ...rawItem,
             userId: uid,
           };
-          // addDoc создаст новый ID
           await addDoc(collection(db, 'wishlist'), itemWithUid);
         }
 
-        // Перезагрузка из Firestore
         await fetchWishlistItems(uid);
-        await fetchWishlistCategories(uid);
-
         alert('Import successful!');
       } catch (err) {
         alert('Error during import!');
@@ -347,7 +250,7 @@ const WishlistTracker: React.FC = () => {
 
   const exportData = () => {
     try {
-      const exportObj = { items, categories };
+      const exportObj = { items };
       const jsonStr = JSON.stringify(exportObj, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -373,7 +276,7 @@ const WishlistTracker: React.FC = () => {
     } else if (sortBy === 'price') {
       return (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0);
     } else if (sortBy === 'priority') {
-      const vals = { hoch: 3, mittel: 2, niedrig: 1 };
+      const vals = { high: 3, medium: 2, low: 1 };
       return vals[b.priority] - vals[a.priority];
     }
     return 0;
@@ -381,11 +284,11 @@ const WishlistTracker: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'hoch':
+      case 'high':
         return 'bg-red-500';
-      case 'mittel':
+      case 'medium':
         return 'bg-yellow-500';
-      case 'niedrig':
+      case 'low':
         return 'bg-green-500';
       default:
         return 'bg-gray-500';
@@ -409,7 +312,7 @@ const WishlistTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Фильтр и сортировка */}
+      {/* Filter & Sort */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-2">
           <select
@@ -439,7 +342,7 @@ const WishlistTracker: React.FC = () => {
         </button>
       </div>
 
-      {/* Форма для добавления/редактирования */}
+      {/* Form: Create / Edit Wishlist Item */}
       {isAdding && (
         <div className="bg-gray-700 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
@@ -496,12 +399,12 @@ const WishlistTracker: React.FC = () => {
                 <label className="block text-sm font-medium mb-1">Priority</label>
                 <select
                   value={itemPriority}
-                  onChange={(e) => setItemPriority(e.target.value as 'niedrig' | 'mittel' | 'hoch')}
+                  onChange={(e) => setItemPriority(e.target.value as 'low' | 'medium' | 'high')}
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded"
                 >
-                  <option value="niedrig">Low</option>
-                  <option value="mittel">Medium</option>
-                  <option value="hoch">High</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
                 </select>
               </div>
 
@@ -531,16 +434,13 @@ const WishlistTracker: React.FC = () => {
               {/* Image */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Upload Image* {editingId ? '(оставьте пустым, если не менять)' : ''}
+                  Upload Image* {editingId ? '(leave empty to keep current)' : ''}
                 </label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded
-                             file:border-0 file:text-sm file:font-semibold
-                             file:bg-gray-600 file:text-gray-200
-                             hover:file:bg-gray-500 mt-1"
+                  className="block w-full text-sm mt-1 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500"
                   required={!editingId || (!editingId && !itemImage)}
                 />
               </div>
@@ -577,37 +477,7 @@ const WishlistTracker: React.FC = () => {
         </div>
       )}
 
-      {/* Управление категориями */}
-      <div className="bg-gray-700 rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-3">Manage Categories</h3>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {categories.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-2">
-              <span className="bg-gray-600 px-3 py-1 rounded">{cat.name}</span>
-              <button
-                onClick={() => handleDeleteCategory(cat.id)}
-                className="text-red-400 hover:text-red-300"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            className="flex-1 bg-gray-800 text-white px-3 py-2 rounded"
-            placeholder="New Category..."
-          />
-          <button onClick={handleAddCategory} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Список wishlist-элементов */}
+      {/* Display Wishlist Items */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sortedItems.length === 0 ? (
           <div className="col-span-full text-center py-8 bg-gray-700 rounded-lg">
@@ -635,7 +505,7 @@ const WishlistTracker: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2 mb-2">
                 <span className={`text-xs px-2 py-1 rounded ${getPriorityColor(item.priority)}`}>
-                  {item.priority}
+                  {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
                 </span>
                 {categories.find((c) => c.id === item.category) && (
                   <span className="text-xs bg-gray-600 px-2 py-1 rounded">
