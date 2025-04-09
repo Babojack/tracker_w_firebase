@@ -5,7 +5,7 @@ interface CityPreviewProps {
   toCity: string;
 }
 
-const UNSPLASH_ACCESS_KEY = 'YOUR_UNSPLASH_ACCESS_KEY'; // Hier deinen Unsplash API Key eintragen
+const UNSPLASH_ACCESS_KEY = 'eaoJsyekalUxfaf14RLHfxbBpnXMeadOlk_LeOG36y0'; // Hier deinen Unsplash API Key eintragen
 
 // Funktion: Holt das erste passende Bild von der Unsplash API
 const getCityImageUrl = async (city: string): Promise<string | null> => {

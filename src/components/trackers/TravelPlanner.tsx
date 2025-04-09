@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import {
   Plus,
@@ -60,7 +61,8 @@ interface CityImageResponse {
   photographerProfile: string;
 }
 
-const UNSPLASH_ACCESS_KEY = 'YOUR_UNSPLASH_ACCESS_KEY';
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_KEY;
+;
 
 const fetchCityImage = async (city: string): Promise<CityImageResponse | null> => {
   try {
