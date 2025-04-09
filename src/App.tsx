@@ -8,7 +8,7 @@ import {
   Plus,
   Calculator,
   Gift,
-  Airplay,
+  Plane,
 } from 'lucide-react';
 
 import ProjectTracker from './components/trackers/ProjectTracker';
@@ -220,7 +220,7 @@ const App: React.FC = () => {
     { id: 'todos', name: "ToDo's", Icon: Plus },
     { id: 'budget', name: 'Household Budget', Icon: Calculator },
     { id: 'wishlist', name: 'Wishlist', Icon: Gift },
-    { id: 'travel', name: 'Travel Planner', Icon: Airplay },
+    { id: 'travel', name: 'Travel Planner', Icon: Plane },
   ];
 
   return (
