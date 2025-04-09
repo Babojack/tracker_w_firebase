@@ -9,6 +9,8 @@ import {
   Calendar,
   Download,
   Upload,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import { db, auth } from '../../firebaseConfig';
 import {
@@ -34,6 +36,7 @@ interface WishlistItem {
   createdAt: number;
   image: string;
   userId: string;
+  archived?: boolean; // Neue Eigenschaft für den Archivstatus
 }
 
 interface Category {
@@ -68,6 +71,9 @@ const WishlistTracker: React.FC = () => {
   const [categories] = useState<Category[]>(PREDEFINED_CATEGORIES);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
+
+  // Neuer State, um zwischen aktiven und archivierten Einträgen zu wechseln
+  const [showArchive, setShowArchive] = useState(false);
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -142,15 +148,20 @@ const WishlistTracker: React.FC = () => {
     e.preventDefault();
 
     if (!itemPrice.trim() || !itemImage.trim()) {
-      alert('Please fill required fields: Price and Image.');
+      alert('Bitte fülle die Pflichtfelder aus: Preis und Bild.');
       return;
     }
 
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      alert('User is not logged in!');
+      alert('Benutzer ist nicht eingeloggt!');
       return;
     }
+
+    const existingArchiveValue =
+      editingId && items.find((i) => i.id === editingId)
+        ? items.find((i) => i.id === editingId)?.archived || false
+        : false;
 
     const newItemData = {
       name: itemName,
@@ -165,6 +176,7 @@ const WishlistTracker: React.FC = () => {
         : Date.now(),
       image: itemImage,
       userId: uid,
+      archived: editingId ? existingArchiveValue : false, // archivierter Status
     };
 
     console.log('Submitting item data:', newItemData);
@@ -173,7 +185,9 @@ const WishlistTracker: React.FC = () => {
       if (editingId) {
         await updateDoc(doc(db, 'wishlist', editingId), newItemData);
         setItems((prev) =>
-          prev.map((item) => (item.id === editingId ? { id: editingId, ...newItemData } : item))
+          prev.map((item) =>
+            item.id === editingId ? { id: editingId, ...newItemData } : item
+          )
         );
       } else {
         const docRef = await addDoc(collection(db, 'wishlist'), newItemData);
@@ -211,6 +225,19 @@ const WishlistTracker: React.FC = () => {
     }
   };
 
+  // Toggle archive status (mark as done or restore)
+  const toggleArchiveItem = async (item: WishlistItem) => {
+    try {
+      await updateDoc(doc(db, 'wishlist', item.id), { archived: !item.archived });
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, archived: !i.archived } : i))
+      );
+      console.log('Item archive toggled:', item.id);
+    } catch (err) {
+      console.error('Error toggling archive:', err);
+    }
+  };
+
   // =================== IMPORT / EXPORT ===================
   const importData = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,6 +261,7 @@ const WishlistTracker: React.FC = () => {
           const itemWithUid: Omit<WishlistItem, 'id'> = {
             ...rawItem,
             userId: uid,
+            archived: rawItem.archived || false,
           };
           await addDoc(collection(db, 'wishlist'), itemWithUid);
         }
@@ -266,8 +294,11 @@ const WishlistTracker: React.FC = () => {
   };
 
   // =================== FILTER & SORT ===================
+  // Filter items: Berücksichtige neben der Kategorie auch den Archivstatus.
   const filteredItems = items.filter(
-    (item) => filter === 'all' || item.category === filter
+    (item) =>
+      (showArchive ? item.archived : !item.archived) &&
+      (filter === 'all' || item.category === filter)
   );
 
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -302,13 +333,23 @@ const WishlistTracker: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold">Wishlist</h2>
         <div className="flex gap-3">
-          <button onClick={exportData} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
+          <button
+            onClick={exportData}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
             <Download size={18} /> Export
           </button>
           <label className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded flex items-center gap-2 cursor-pointer">
             <Upload size={18} /> Import
             <input type="file" accept=".json" onChange={importData} className="hidden" />
           </label>
+          {/* Toggle zwischen aktiven und archivierten Karten */}
+          <button
+            onClick={() => setShowArchive(!showArchive)}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
+          >
+            {showArchive ? 'Aktive Wünsche' : 'Archiv'}
+          </button>
         </div>
       </div>
 
@@ -320,7 +361,7 @@ const WishlistTracker: React.FC = () => {
             onChange={(e) => setFilter(e.target.value)}
             className="bg-gray-700 text-white px-3 py-2 rounded"
           >
-            <option value="all">All Categories</option>
+            <option value="all">Alle Kategorien</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
@@ -332,21 +373,29 @@ const WishlistTracker: React.FC = () => {
             onChange={(e) => setSortBy(e.target.value)}
             className="bg-gray-700 text-white px-3 py-2 rounded"
           >
-            <option value="date">By Date</option>
-            <option value="price">By Price</option>
-            <option value="priority">By Priority</option>
+            <option value="date">Nach Datum</option>
+            <option value="price">Nach Preis</option>
+            <option value="priority">Nach Priorität</option>
           </select>
         </div>
-        <button onClick={() => setIsAdding(true)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-          New Wish
-        </button>
+        {/* Nur im aktiven Modus erlauben, neue Wünsche hinzuzufügen */}
+        {!showArchive && (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            Neuer Wunsch
+          </button>
+        )}
       </div>
 
       {/* Form: Create / Edit Wishlist Item */}
       {isAdding && (
         <div className="bg-gray-700 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{editingId ? 'Edit Wish' : 'Add New Wish'}</h3>
+            <h3 className="text-lg font-semibold">
+              {editingId ? 'Wunsch bearbeiten' : 'Neuer Wunsch'}
+            </h3>
             <button onClick={resetForm} className="text-gray-400 hover:text-white">
               <X size={20} />
             </button>
@@ -367,7 +416,7 @@ const WishlistTracker: React.FC = () => {
 
               {/* Category */}
               <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
+                <label className="block text-sm font-medium mb-1">Kategorie</label>
                 <select
                   value={itemCategory}
                   onChange={(e) => setItemCategory(e.target.value)}
@@ -383,7 +432,7 @@ const WishlistTracker: React.FC = () => {
 
               {/* Price */}
               <div>
-                <label className="block text-sm font-medium mb-1">Price (€)*</label>
+                <label className="block text-sm font-medium mb-1">Preis (€)*</label>
                 <input
                   type="text"
                   value={itemPrice}
@@ -396,15 +445,15 @@ const WishlistTracker: React.FC = () => {
 
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium mb-1">Priority</label>
+                <label className="block text-sm font-medium mb-1">Priorität</label>
                 <select
                   value={itemPriority}
                   onChange={(e) => setItemPriority(e.target.value as 'low' | 'medium' | 'high')}
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded"
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="low">Niedrig</option>
+                  <option value="medium">Mittel</option>
+                  <option value="high">Hoch</option>
                 </select>
               </div>
 
@@ -422,7 +471,7 @@ const WishlistTracker: React.FC = () => {
 
               {/* Target Date */}
               <div>
-                <label className="block text-sm font-medium mb-1">Target Date</label>
+                <label className="block text-sm font-medium mb-1">Zieldatum</label>
                 <input
                   type="date"
                   value={itemTargetDate}
@@ -434,7 +483,7 @@ const WishlistTracker: React.FC = () => {
               {/* Image */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Upload Image* {editingId ? '(leave empty to keep current)' : ''}
+                  Bild hochladen* {editingId ? '(leer lassen, um aktuelles Bild zu behalten)' : ''}
                 </label>
                 <input
                   type="file"
@@ -448,7 +497,7 @@ const WishlistTracker: React.FC = () => {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
+              <label className="block text-sm font-medium mb-1">Beschreibung</label>
               <textarea
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
@@ -464,13 +513,13 @@ const WishlistTracker: React.FC = () => {
                 onClick={resetForm}
                 className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded"
               >
-                Cancel
+                Abbrechen
               </button>
               <button
                 type="submit"
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-1"
               >
-                <Save size={18} /> Save
+                <Save size={18} /> Speichern
               </button>
             </div>
           </form>
@@ -481,23 +530,45 @@ const WishlistTracker: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sortedItems.length === 0 ? (
           <div className="col-span-full text-center py-8 bg-gray-700 rounded-lg">
-            <p className="text-gray-400">No wishes found in this category.</p>
+            <p className="text-gray-400">
+              {showArchive
+                ? 'Keine archivierten Wünsche gefunden.'
+                : 'Keine Wünsche in dieser Kategorie gefunden.'}
+            </p>
           </div>
         ) : (
           sortedItems.map((item) => (
-            <div key={item.id} className="bg-gray-700 rounded-lg p-4 flex flex-col h-full">
+            <div
+              key={item.id}
+              className={`bg-gray-700 rounded-lg p-4 flex flex-col h-full ${
+                item.archived ? 'border-2 border-gray-500' : ''
+              }`}
+            >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-lg font-semibold">{item.name}</h3>
                 <div className="flex gap-1">
+                  {/* Toggle-Button: Falls nicht archiviert, kann man es als erledigt markieren,
+                      falls archiviert, wiederherstellen */}
+                  <button
+                    onClick={() => toggleArchiveItem(item)}
+                    className="p-1 hover:opacity-80"
+                    title={
+                      item.archived ? 'Wunsch wiederherstellen' : 'Als erledigt markieren'
+                    }
+                  >
+                    {item.archived ? <RotateCcw size={18} /> : <Check size={18} />}
+                  </button>
                   <button
                     onClick={() => startEditing(item)}
                     className="text-blue-400 hover:text-blue-300 p-1"
+                    title="Bearbeiten"
                   >
                     <Edit size={18} />
                   </button>
                   <button
                     onClick={() => handleDeleteItem(item.id)}
                     className="text-red-400 hover:text-red-300 p-1"
+                    title="Löschen"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -519,7 +590,9 @@ const WishlistTracker: React.FC = () => {
                 </div>
               )}
               {item.description && (
-                <p className="text-gray-300 text-sm mb-3 flex-grow">{item.description}</p>
+                <p className="text-gray-300 text-sm mb-3 flex-grow">
+                  {item.description}
+                </p>
               )}
               <div className="mt-auto space-y-1 pt-2 border-t border-gray-600">
                 {item.price && (
