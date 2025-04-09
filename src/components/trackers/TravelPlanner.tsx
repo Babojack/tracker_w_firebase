@@ -62,7 +62,7 @@ interface CityImageResponse {
 }
 
 const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_KEY;
-;
+
 
 const fetchCityImage = async (city: string): Promise<CityImageResponse | null> => {
   try {
