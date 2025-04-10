@@ -1,4 +1,6 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
+import ReactDatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 import {
   collection,
   getDocs,
@@ -12,13 +14,14 @@ import {
 import { db, auth } from '../../firebaseConfig';
 
 // --------------------------------------------------------
-//    1. Typen und Interfaces
+// 1. Types and Interfaces
 // --------------------------------------------------------
 interface FinancialEntry {
   category: string;
   amount: string;
   purpose: string;
   userId?: string;
+  month?: string; // Month in the format "YYYY-MM"
 }
 
 interface BudgetData {
@@ -26,13 +29,13 @@ interface BudgetData {
   expenses: (FinancialEntry & { id: string })[];
 }
 
-// Hilfsfunktion zum Parsen deutscher Zahlen (Komma als Dezimaltrenner)
+// Helper function to parse German number formats (comma as decimal separator)
 function parseGermanFloat(value: string): number {
   return parseFloat(value.replace(',', '.'));
 }
 
 // --------------------------------------------------------
-//    2. Export- / Import-Funktionen
+// 2. Export/Import Functions
 // --------------------------------------------------------
 export function exportData(data: any, filename: string = 'progress.json') {
   const jsonData = JSON.stringify(data, null, 2);
@@ -67,10 +70,10 @@ export function importData(callback: (data: any) => void) {
 }
 
 // --------------------------------------------------------
-//    3. Hauptkomponente: HouseholdBudgetCalculator
+// 3. Main Component: HouseholdBudgetCalculator
 // --------------------------------------------------------
 const HouseholdBudgetCalculator: React.FC = () => {
-  // Default-Kategorien
+  // Default categories
   const defaultIncomeCategories = [
     'Salary Person 1',
     'Salary Person 2',
@@ -85,33 +88,45 @@ const HouseholdBudgetCalculator: React.FC = () => {
     'Insurance',
   ];
 
-  // State für Incomes und Expenses (jedes Dokument hat eine eigene ID)
+  // State for the selected month as a Date
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+
+  // State for incomes and expenses (each document has its own ID)
   const [incomes, setIncomes] = useState<(FinancialEntry & { id: string })[]>([]);
   const [expenses, setExpenses] = useState<(FinancialEntry & { id: string })[]>([]);
 
-  // Notification-State
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' }>({ message: '', type: 'success' });
+  // Notification state
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' }>({
+    message: '',
+    type: 'success',
+  });
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type });
     setTimeout(() => setNotification({ message: '', type: 'success' }), 3000);
   };
 
-  // Daten aus Firestore laden (nur Dokumente des aktuellen Users)
+  // Load data from Firestore for the current user and the selected month
   useEffect(() => {
+    const monthString = selectedMonth.toISOString().slice(0, 7);
     const fetchData = async () => {
+      // Fetch incomes
       try {
         const incomesQuery = query(
           collection(db, 'incomes'),
-          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
+          where('userId', '==', auth.currentUser ? auth.currentUser.uid : ''),
+          where('month', '==', monthString)
         );
         const incomesSnap = await getDocs(incomesQuery);
-        let loadedIncomes = incomesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
+        let loadedIncomes = incomesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
+
+        // If no incomes found for the selected month, create default entries for this month
         if (loadedIncomes.length === 0) {
-          const defaultIncomes = defaultIncomeCategories.map(category => ({
+          const defaultIncomes = defaultIncomeCategories.map((category) => ({
             category,
             amount: '0',
             purpose: '',
             userId: auth.currentUser ? auth.currentUser.uid : '',
+            month: monthString,
           }));
           for (const income of defaultIncomes) {
             const docRef = await addDoc(collection(db, 'incomes'), income);
@@ -123,19 +138,24 @@ const HouseholdBudgetCalculator: React.FC = () => {
         console.error('Error loading incomes:', error);
       }
 
+      // Fetch expenses
       try {
         const expensesQuery = query(
           collection(db, 'expenses'),
-          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
+          where('userId', '==', auth.currentUser ? auth.currentUser.uid : ''),
+          where('month', '==', monthString)
         );
         const expensesSnap = await getDocs(expensesQuery);
-        let loadedExpenses = expensesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
+        let loadedExpenses = expensesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as (FinancialEntry & { id: string })[];
+
+        // If no expenses found for the selected month, create default entries for this month
         if (loadedExpenses.length === 0) {
-          const defaultExpenses = defaultExpenseCategories.map(category => ({
+          const defaultExpenses = defaultExpenseCategories.map((category) => ({
             category,
             amount: '0',
             purpose: '',
             userId: auth.currentUser ? auth.currentUser.uid : '',
+            month: monthString,
           }));
           for (const expense of defaultExpenses) {
             const docRef = await addDoc(collection(db, 'expenses'), expense);
@@ -149,21 +169,27 @@ const HouseholdBudgetCalculator: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedMonth]);
 
-  // Summen berechnen
+  // Calculate totals
   const calculateTotals = () => {
-    const totalIncome = incomes.reduce((sum, entry) => sum + parseGermanFloat(entry.amount || '0'), 0);
-    const totalExpenses = expenses.reduce((sum, entry) => sum + parseGermanFloat(entry.amount || '0'), 0);
+    const totalIncome = incomes.reduce(
+      (sum, entry) => sum + parseGermanFloat(entry.amount || '0'),
+      0
+    );
+    const totalExpenses = expenses.reduce(
+      (sum, entry) => sum + parseGermanFloat(entry.amount || '0'),
+      0
+    );
     const balance = totalIncome - totalExpenses;
     return { totalIncome, totalExpenses, balance };
   };
 
-  // Update-Funktionen: Jeweils anhand der Dokument-ID
+  // Update functions: update by document ID
   const updateIncomeEntry = async (id: string, field: keyof FinancialEntry, value: string) => {
     try {
       await updateDoc(doc(db, 'incomes', id), { [field]: value });
-      setIncomes(prev => prev.map(income => income.id === id ? { ...income, [field]: value } : income));
+      setIncomes((prev) => prev.map((income) => (income.id === id ? { ...income, [field]: value } : income)));
     } catch (error) {
       console.error('Error updating income entry:', error);
     }
@@ -172,23 +198,27 @@ const HouseholdBudgetCalculator: React.FC = () => {
   const updateExpenseEntry = async (id: string, field: keyof FinancialEntry, value: string) => {
     try {
       await updateDoc(doc(db, 'expenses', id), { [field]: value });
-      setExpenses(prev => prev.map(expense => expense.id === id ? { ...expense, [field]: value } : expense));
+      setExpenses((prev) =>
+        prev.map((expense) => (expense.id === id ? { ...expense, [field]: value } : expense))
+      );
     } catch (error) {
       console.error('Error updating expense entry:', error);
     }
   };
 
-  // Neue Zeile hinzufügen
+  // Add a new row
   const addIncomeRow = async () => {
     try {
+      const monthString = selectedMonth.toISOString().slice(0, 7);
       const newIncome: FinancialEntry = {
         category: 'New Income',
         amount: '0',
         purpose: '',
         userId: auth.currentUser ? auth.currentUser.uid : '',
+        month: monthString,
       };
       const docRef = await addDoc(collection(db, 'incomes'), newIncome);
-      setIncomes(prev => [...prev, { id: docRef.id, ...newIncome }]);
+      setIncomes((prev) => [...prev, { id: docRef.id, ...newIncome }]);
     } catch (error) {
       console.error('Error adding income row:', error);
     }
@@ -196,24 +226,26 @@ const HouseholdBudgetCalculator: React.FC = () => {
 
   const addExpenseRow = async () => {
     try {
+      const monthString = selectedMonth.toISOString().slice(0, 7);
       const newExpense: FinancialEntry = {
         category: 'New Expense',
         amount: '0',
         purpose: '',
         userId: auth.currentUser ? auth.currentUser.uid : '',
+        month: monthString,
       };
       const docRef = await addDoc(collection(db, 'expenses'), newExpense);
-      setExpenses(prev => [...prev, { id: docRef.id, ...newExpense }]);
+      setExpenses((prev) => [...prev, { id: docRef.id, ...newExpense }]);
     } catch (error) {
       console.error('Error adding expense row:', error);
     }
   };
 
-  // Zeile löschen
+  // Delete a row
   const deleteIncomeRow = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'incomes', id));
-      setIncomes(prev => prev.filter(income => income.id !== id));
+      setIncomes((prev) => prev.filter((income) => income.id !== id));
     } catch (error) {
       console.error('Error deleting income row:', error);
     }
@@ -222,33 +254,47 @@ const HouseholdBudgetCalculator: React.FC = () => {
   const deleteExpenseRow = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'expenses', id));
-      setExpenses(prev => prev.filter(expense => expense.id !== id));
+      setExpenses((prev) => prev.filter((expense) => expense.id !== id));
     } catch (error) {
       console.error('Error deleting expense row:', error);
     }
   };
 
-  // Zusammenfassung berechnen
-  const { totalIncome, totalExpenses, balance } = calculateTotals();
-
-  // Auf Default zurücksetzen: Lösche alle Dokumente und lege Standardwerte an
+  // Reset data for the selected month: delete existing documents for this month and create defaults
   const resetTables = async () => {
     try {
-      const incomesSnap = await getDocs(collection(db, 'incomes'));
+      const monthString = selectedMonth.toISOString().slice(0, 7);
+      // Delete incomes for the current month
+      const incomesQuery = query(
+        collection(db, 'incomes'),
+        where('userId', '==', auth.currentUser ? auth.currentUser.uid : ''),
+        where('month', '==', monthString)
+      );
+      const incomesSnap = await getDocs(incomesQuery);
       for (const docSnap of incomesSnap.docs) {
         await deleteDoc(doc(db, 'incomes', docSnap.id));
       }
-      const expensesSnap = await getDocs(collection(db, 'expenses'));
+
+      // Delete expenses for the current month
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('userId', '==', auth.currentUser ? auth.currentUser.uid : ''),
+        where('month', '==', monthString)
+      );
+      const expensesSnap = await getDocs(expensesQuery);
       for (const docSnap of expensesSnap.docs) {
         await deleteDoc(doc(db, 'expenses', docSnap.id));
       }
+
       showNotification('Data reset.', 'success');
 
-      const defaultIncomes = defaultIncomeCategories.map(category => ({
+      // Create default incomes for the current month
+      const defaultIncomes = defaultIncomeCategories.map((category) => ({
         category,
         amount: '0',
         purpose: '',
         userId: auth.currentUser ? auth.currentUser.uid : '',
+        month: monthString,
       }));
       const newIncomes: (FinancialEntry & { id: string })[] = [];
       for (const income of defaultIncomes) {
@@ -257,11 +303,13 @@ const HouseholdBudgetCalculator: React.FC = () => {
       }
       setIncomes(newIncomes);
 
-      const defaultExpenses = defaultExpenseCategories.map(category => ({
+      // Create default expenses for the current month
+      const defaultExpenses = defaultExpenseCategories.map((category) => ({
         category,
         amount: '0',
         purpose: '',
         userId: auth.currentUser ? auth.currentUser.uid : '',
+        month: monthString,
       }));
       const newExpenses: (FinancialEntry & { id: string })[] = [];
       for (const expense of defaultExpenses) {
@@ -293,28 +341,62 @@ const HouseholdBudgetCalculator: React.FC = () => {
     });
   };
 
+  // Calculate summary values
+  const { totalIncome, totalExpenses, balance } = calculateTotals();
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-gray-900">
       <h1 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
         Household Budget Calculator
       </h1>
 
+      {/* Month Picker using a calendar picker */}
+      <div className="mb-4">
+        <label htmlFor="monthSelect" className="text-white mr-2">
+          Select Month:
+        </label>
+        <ReactDatePicker
+          selected={selectedMonth}
+          onChange={(date: Date) => date && setSelectedMonth(date)}
+          dateFormat="yyyy-MM"
+          showMonthYearPicker
+          className="p-2 bg-gray-700 text-white rounded"
+        />
+      </div>
+
       {/* Notifications */}
       {notification.message && (
-        <div className={`p-3 sm:p-4 rounded mb-4 ${notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+        <div
+          className={`p-3 sm:p-4 rounded mb-4 ${
+            notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          }`}
+        >
           {notification.message}
         </div>
       )}
 
-      {/* Button-Leiste */}
+      {/* Button Toolbar */}
       <div className="flex flex-col sm:flex-row justify-end mb-4 sm:mb-6 space-y-2 sm:space-y-0 sm:space-x-2">
-        <button onClick={() => { if (window.confirm('Are you sure you want to reset all data?')) { resetTables(); } }} className="bg-gray-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-gray-600 text-sm sm:text-base">
+        <button
+          onClick={() => {
+            if (window.confirm('Are you sure you want to reset all data for the selected month?')) {
+              resetTables();
+            }
+          }}
+          className="bg-gray-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-gray-600 text-sm sm:text-base"
+        >
           Reset
         </button>
-        <button onClick={handleExport} className="bg-blue-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-blue-600 text-sm sm:text-base">
+        <button
+          onClick={handleExport}
+          className="bg-blue-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-blue-600 text-sm sm:text-base"
+        >
           Export
         </button>
-        <button onClick={handleImport} className="bg-blue-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-blue-600 text-sm sm:text-base">
+        <button
+          onClick={handleImport}
+          className="bg-blue-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded hover:bg-blue-600 text-sm sm:text-base"
+        >
           Import
         </button>
       </div>
@@ -323,12 +405,13 @@ const HouseholdBudgetCalculator: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Incomes */}
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">
-            Income
-          </h2>
+          <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">Income</h2>
           <div className="bg-gray-800 rounded-lg p-3 sm:p-4">
             {incomes.map((entry) => (
-              <div key={entry.id} className="mb-2 sm:mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <div
+                key={entry.id}
+                className="mb-2 sm:mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2"
+              >
                 <input
                   type="text"
                   value={entry.category}
@@ -350,12 +433,18 @@ const HouseholdBudgetCalculator: React.FC = () => {
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Purpose"
                 />
-                <button onClick={() => deleteIncomeRow(entry.id)} className="bg-red-500 text-white px-3 py-2 rounded self-start">
+                <button
+                  onClick={() => deleteIncomeRow(entry.id)}
+                  className="bg-red-500 text-white px-3 py-2 rounded self-start"
+                >
                   X
                 </button>
               </div>
             ))}
-            <button onClick={addIncomeRow} className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 text-sm">
+            <button
+              onClick={addIncomeRow}
+              className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 text-sm"
+            >
               + Add Income
             </button>
           </div>
@@ -363,12 +452,13 @@ const HouseholdBudgetCalculator: React.FC = () => {
 
         {/* Expenses */}
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">
-            Expenses
-          </h2>
+          <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">Expenses</h2>
           <div className="bg-gray-800 rounded-lg p-3 sm:p-4">
             {expenses.map((entry) => (
-              <div key={entry.id} className="mb-2 sm:mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <div
+                key={entry.id}
+                className="mb-2 sm:mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2"
+              >
                 <input
                   type="text"
                   value={entry.category}
@@ -390,23 +480,27 @@ const HouseholdBudgetCalculator: React.FC = () => {
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Purpose"
                 />
-                <button onClick={() => deleteExpenseRow(entry.id)} className="bg-red-500 text-white px-3 py-2 rounded self-start">
+                <button
+                  onClick={() => deleteExpenseRow(entry.id)}
+                  className="bg-red-500 text-white px-3 py-2 rounded self-start"
+                >
                   X
                 </button>
               </div>
             ))}
-            <button onClick={addExpenseRow} className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 text-sm">
+            <button
+              onClick={addExpenseRow}
+              className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600 text-sm"
+            >
               + Add Expense
             </button>
           </div>
         </div>
       </div>
 
-      {/* Zusammenfassung */}
+      {/* Summary */}
       <div className="mt-4 sm:mt-6 bg-gray-800 rounded-lg p-3 sm:p-4">
-        <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">
-          Summary
-        </h2>
+        <h2 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-4">Summary</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-white">
           <div className="bg-gray-700 p-3 sm:p-4 rounded">
             <h3 className="text-base sm:text-lg font-semibold">Total Income</h3>
@@ -418,7 +512,11 @@ const HouseholdBudgetCalculator: React.FC = () => {
           </div>
           <div className="bg-gray-700 p-3 sm:p-4 rounded">
             <h3 className="text-base sm:text-lg font-semibold">Balance</h3>
-            <p className={`text-xl sm:text-2xl font-bold ${balance > 0 ? 'text-green-400' : balance < 0 ? 'text-red-400' : 'text-white'}`}>
+            <p
+              className={`text-xl sm:text-2xl font-bold ${
+                balance > 0 ? 'text-green-400' : balance < 0 ? 'text-red-400' : 'text-white'
+              }`}
+            >
               {balance.toFixed(2)} $
             </p>
           </div>
