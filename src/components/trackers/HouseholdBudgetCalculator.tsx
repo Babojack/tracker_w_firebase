@@ -1,6 +1,7 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { debounce } from 'lodash';
 import {
   collection,
   getDocs,
@@ -105,6 +106,30 @@ const HouseholdBudgetCalculator: React.FC = () => {
     setTimeout(() => setNotification({ message: '', type: 'success' }), 3000);
   };
 
+  // Debounced update functions for incomes and expenses
+  const debouncedIncomeUpdate = debounce((id: string, field: keyof FinancialEntry, value: string) => {
+    updateDoc(doc(db, 'incomes', id), { [field]: value }).catch((error) =>
+      console.error('Error updating income entry:', error)
+    );
+  }, 300, { maxWait: 500 });
+
+  const debouncedExpenseUpdate = debounce((id: string, field: keyof FinancialEntry, value: string) => {
+    updateDoc(doc(db, 'expenses', id), { [field]: value }).catch((error) =>
+      console.error('Error updating expense entry:', error)
+    );
+  }, 300, { maxWait: 500 });
+
+  // Flush pending updates on page unload (so changes are sent even on rapid refresh)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      debouncedIncomeUpdate.flush();
+      debouncedExpenseUpdate.flush();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   // Load data from Firestore for the current user and the selected month
   useEffect(() => {
     const monthString = selectedMonth.toISOString().slice(0, 7);
@@ -183,27 +208,6 @@ const HouseholdBudgetCalculator: React.FC = () => {
     );
     const balance = totalIncome - totalExpenses;
     return { totalIncome, totalExpenses, balance };
-  };
-
-  // Update functions: update by document ID
-  const updateIncomeEntry = async (id: string, field: keyof FinancialEntry, value: string) => {
-    try {
-      await updateDoc(doc(db, 'incomes', id), { [field]: value });
-      setIncomes((prev) => prev.map((income) => (income.id === id ? { ...income, [field]: value } : income)));
-    } catch (error) {
-      console.error('Error updating income entry:', error);
-    }
-  };
-
-  const updateExpenseEntry = async (id: string, field: keyof FinancialEntry, value: string) => {
-    try {
-      await updateDoc(doc(db, 'expenses', id), { [field]: value });
-      setExpenses((prev) =>
-        prev.map((expense) => (expense.id === id ? { ...expense, [field]: value } : expense))
-      );
-    } catch (error) {
-      console.error('Error updating expense entry:', error);
-    }
   };
 
   // Add a new row
@@ -357,7 +361,7 @@ const HouseholdBudgetCalculator: React.FC = () => {
         </label>
         <ReactDatePicker
           selected={selectedMonth}
-          onChange={(date: Date) => date && setSelectedMonth(date)}
+          onChange={(date: Date | null) => date && setSelectedMonth(date)}
           dateFormat="yyyy-MM"
           showMonthYearPicker
           className="p-2 bg-gray-700 text-white rounded"
@@ -415,21 +419,42 @@ const HouseholdBudgetCalculator: React.FC = () => {
                 <input
                   type="text"
                   value={entry.category}
-                  onChange={(e) => updateIncomeEntry(entry.id, 'category', e.target.value)}
+                  onChange={(e) => {
+                    setIncomes((prev) =>
+                      prev.map((income) =>
+                        income.id === entry.id ? { ...income, category: e.target.value } : income
+                      )
+                    );
+                    debouncedIncomeUpdate(entry.id, 'category', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Category"
                 />
                 <input
                   type="text"
                   value={entry.amount}
-                  onChange={(e) => updateIncomeEntry(entry.id, 'amount', e.target.value)}
+                  onChange={(e) => {
+                    setIncomes((prev) =>
+                      prev.map((income) =>
+                        income.id === entry.id ? { ...income, amount: e.target.value } : income
+                      )
+                    );
+                    debouncedIncomeUpdate(entry.id, 'amount', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Amount"
                 />
                 <input
                   type="text"
                   value={entry.purpose}
-                  onChange={(e) => updateIncomeEntry(entry.id, 'purpose', e.target.value)}
+                  onChange={(e) => {
+                    setIncomes((prev) =>
+                      prev.map((income) =>
+                        income.id === entry.id ? { ...income, purpose: e.target.value } : income
+                      )
+                    );
+                    debouncedIncomeUpdate(entry.id, 'purpose', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Purpose"
                 />
@@ -462,21 +487,42 @@ const HouseholdBudgetCalculator: React.FC = () => {
                 <input
                   type="text"
                   value={entry.category}
-                  onChange={(e) => updateExpenseEntry(entry.id, 'category', e.target.value)}
+                  onChange={(e) => {
+                    setExpenses((prev) =>
+                      prev.map((expense) =>
+                        expense.id === entry.id ? { ...expense, category: e.target.value } : expense
+                      )
+                    );
+                    debouncedExpenseUpdate(entry.id, 'category', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Category"
                 />
                 <input
                   type="text"
                   value={entry.amount}
-                  onChange={(e) => updateExpenseEntry(entry.id, 'amount', e.target.value)}
+                  onChange={(e) => {
+                    setExpenses((prev) =>
+                      prev.map((expense) =>
+                        expense.id === entry.id ? { ...expense, amount: e.target.value } : expense
+                      )
+                    );
+                    debouncedExpenseUpdate(entry.id, 'amount', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Amount"
                 />
                 <input
                   type="text"
                   value={entry.purpose}
-                  onChange={(e) => updateExpenseEntry(entry.id, 'purpose', e.target.value)}
+                  onChange={(e) => {
+                    setExpenses((prev) =>
+                      prev.map((expense) =>
+                        expense.id === entry.id ? { ...expense, purpose: e.target.value } : expense
+                      )
+                    );
+                    debouncedExpenseUpdate(entry.id, 'purpose', e.target.value);
+                  }}
                   className="w-full sm:w-1/3 p-2 bg-gray-700 text-white rounded text-sm"
                   placeholder="Purpose"
                 />
