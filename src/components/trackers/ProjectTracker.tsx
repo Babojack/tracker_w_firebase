@@ -391,8 +391,17 @@ const ProjectTracker: React.FC = () => {
                     onChange={(e) =>
                       setGoals(goals.map(g => g.id === goal.id ? { ...g, name: e.target.value } : g))
                     }
+                    onBlur={async () => {
+                      try {
+                        const goalRef = doc(db, "projectTrackerGoals", goal.id);
+                        await updateDoc(goalRef, { name: goal.name });
+                      } catch (error) {
+                        console.error("Ошибка при обновлении имени:", error);
+                      }
+                    }}
                     className="bg-transparent font-semibold text-sm sm:text-base outline-none max-w-full"
                   />
+
                 </div>
 
                 <div className="flex justify-between items-center mt-1">
