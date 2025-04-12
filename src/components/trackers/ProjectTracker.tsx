@@ -442,13 +442,24 @@ const ProjectTracker: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <span className="block text-xs sm:text-sm font-semibold mb-1">Level of difficulty</span>
                 <DifficultyIndicator
                   value={goal.difficulty}
-                  onChange={(newVal) =>
-                    setGoals(goals.map(g => g.id === goal.id ? { ...g, difficulty: newVal } : g))
-                  }
+                  onChange={async (newVal) => {
+                    const updatedGoals = goals.map(g =>
+                      g.id === goal.id ? { ...g, difficulty: newVal } : g
+                    );
+                    setGoals(updatedGoals);
+
+                    // ✅ Сохраняем в Firestore
+                    try {
+                      const goalRef = doc(db, "projectTrackerGoals", goal.id);
+                      await updateDoc(goalRef, { difficulty: newVal });
+                    } catch (error) {
+                      console.error("Ошибка при обновлении сложности:", error);
+                    }
+                  }}
                 />
+
               </div>
 
               <div className="mb-3">
@@ -609,13 +620,24 @@ const ProjectTracker: React.FC = () => {
                   </div>
 
                   <div className="mb-3">
-                    <span className="block text-xs sm:text-sm font-semibold mb-1">Level of difficulty</span>
                     <DifficultyIndicator
                       value={goal.difficulty}
-                      onChange={(newVal) =>
-                        setGoals(goals.map(g => g.id === goal.id ? { ...g, difficulty: newVal } : g))
-                      }
+                      onChange={async (newVal) => {
+                        const updatedGoals = goals.map(g =>
+                          g.id === goal.id ? { ...g, difficulty: newVal } : g
+                        );
+                        setGoals(updatedGoals);
+
+                        // ✅ Сохраняем в Firestore
+                        try {
+                          const goalRef = doc(db, "projectTrackerGoals", goal.id);
+                          await updateDoc(goalRef, { difficulty: newVal });
+                        } catch (error) {
+                          console.error("Ошибка при обновлении сложности:", error);
+                        }
+                      }}
                     />
+
                   </div>
 
                   <div className="mb-3">
