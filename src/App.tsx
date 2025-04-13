@@ -9,6 +9,7 @@ import {
   Calculator,
   Gift,
   Plane,
+  ShoppingCart
 } from 'lucide-react';
 
 import ProjectTracker from './components/trackers/ProjectTracker';
@@ -19,6 +20,7 @@ import TodoTracker from './components/trackers/TodoTracker';
 import HouseholdBudgetCalculator from './components/trackers/HouseholdBudgetCalculator';
 import WishlistTracker from './components/trackers/WishlistTracker';
 import TravelPlanner from './components/trackers/TravelPlanner';
+import ShoppingListTracker from './components/trackers/ShoppingListTracker';
 
 import ProfileSettings from './components/ProfileSettings';
 import AuthComponent from './components/AuthComponent';
@@ -27,6 +29,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 
+// Erweitern des TabId-Typs um "shopping"
 type TabId =
   | 'dashboard'
   | 'projects'
@@ -36,7 +39,8 @@ type TabId =
   | 'todos'
   | 'budget'
   | 'wishlist'
-  | 'travel';
+  | 'travel'
+  | 'shopping';
 
 interface Tab {
   id: TabId;
@@ -147,6 +151,7 @@ const App: React.FC = () => {
         'budget',
         'wishlist',
         'travel',
+        'shopping'
       ].includes(tabParam)
     ) {
       setActiveTab(tabParam as TabId);
@@ -220,6 +225,7 @@ const App: React.FC = () => {
     { id: 'todos', name: "ToDo's", Icon: Plus },
     { id: 'budget', name: 'Household Budget', Icon: Calculator },
     { id: 'wishlist', name: 'Wishlist', Icon: Gift },
+    { id: 'shopping', name: 'Shopping List', Icon: ShoppingCart },
     { id: 'travel', name: 'Travel Planner', Icon: Plane },
   ];
 
@@ -325,6 +331,7 @@ const App: React.FC = () => {
               {activeTab === 'todos' && <TodoTracker />}
               {activeTab === 'budget' && <HouseholdBudgetCalculator />}
               {activeTab === 'wishlist' && <WishlistTracker />}
+              {activeTab === 'shopping' && <ShoppingListTracker />}
               {activeTab === 'travel' && <TravelPlanner />}
             </>
           )}
