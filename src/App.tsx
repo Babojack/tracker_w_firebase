@@ -12,7 +12,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 
-import LandingPage from './landingpage';  // Deine erweiterte LandingPage
+import LandingPage from './LandingPage';  // Deine erweiterte LandingPage
 
 import ProjectTracker from './components/trackers/ProjectTracker';
 import GoalsTracker from './components/trackers/GoalsTracker';
