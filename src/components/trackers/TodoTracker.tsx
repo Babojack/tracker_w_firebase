@@ -362,13 +362,14 @@ const TodoTracker: React.FC = () => {
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold">ToDo's</h2>
-        <div className="flex gap-2">
+    <div className="w-full max-w-full sm:max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">
+      {/* Angepasster Header mit flex-wrap für mobile Geräte */}
+      <div className="flex flex-wrap justify-between items-center mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-2xl font-bold w-full sm:w-auto mb-2 sm:mb-0">ToDo's</h2>
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="p-1.5 sm:p-2 bg-purple-500 rounded hover:bg-purple-600 transition-colors relative"
+            className="p-2 bg-purple-500 rounded hover:bg-purple-600 transition-colors relative"
             title="Filter Tasks"
           >
             <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -380,7 +381,7 @@ const TodoTracker: React.FC = () => {
           </button>
           <button
             onClick={addNewGroup}
-            className="p-1.5 sm:p-2 bg-blue-500 rounded hover:bg-blue-600 transition-colors"
+            className="p-2 bg-blue-500 rounded hover:bg-blue-600 transition-colors"
             title="Add New Group"
           >
             <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -407,7 +408,7 @@ const TodoTracker: React.FC = () => {
 
       {showFilters && (
         <div className="bg-gray-800 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-          <h3 className="text-lg font-semibold mb-3">Filter Options</h3>
+          <h3 className="text-base sm:text-lg font-semibold mb-3">Filter Options</h3>
           <div className="space-y-3">
             <div>
               <label className="block text-sm mb-1">Search</label>
@@ -548,7 +549,8 @@ const TodoTracker: React.FC = () => {
         </div>
       )}
 
-      <div className="grid gap-4 sm:gap-6">
+      {/* Grid-Layout: eine Spalte auf mobilen Geräten, zwei (oder mehr) Spalten auf größeren Screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {todoGroups.map(group => (
           <div key={group.id} className="bg-gray-800 rounded-lg p-3 sm:p-4 relative">
             <div className="flex justify-between items-center mb-3 sm:mb-4">
