@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 
+// Интерфейс для сообщений чата
 interface Message {
   sender: 'user' | 'system';
   text: string;
@@ -10,76 +11,116 @@ interface Message {
 const FloatingChatGPT: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { sender: 'system', text: 'Hi! What analytics report would you like to generate? You can type a command or select an option below.' }
+    {
+      sender: 'system',
+      text: 'Привет! Какой отчёт по аналитике ты хочешь сгенерировать? Выбери один из вариантов ниже: Mood, Project, Goals.',
+    },
   ]);
-  const [userInput, setUserInput] = useState("");
+  const [userInput, setUserInput] = useState('');
 
+  // Функция для переключения видимости окна чата
   const toggleChat = () => setOpen(!open);
 
+  // Добавление нового сообщения в чат
   const addMessage = (msg: Message) => {
-    setMessages(prev => [...prev, msg]);
+    setMessages((prev) => [...prev, msg]);
   };
 
-  // Функция генерации красивого PDF отчёта с данными из MoodTracker
+  // Функция генерации PDF-отчёта для Mood Tracker
   const handleGenerateMoodReport = () => {
     const doc = new jsPDF();
 
-    // Заголовок и подзаголовок
     doc.setFontSize(22);
-    doc.text("Mood Tracker Report", 20, 20);
+    doc.text('Mood Tracker Report', 20, 20);
     doc.setFontSize(16);
-    doc.text("Detailed analytics from your MoodTracker", 20, 30);
+    doc.text('Detailed analytics from your MoodTracker', 20, 30);
 
-    // Получаем данные из localStorage по ключу "moodTrackerData"
     let moodData: any[] = [];
-    const data = localStorage.getItem("moodTrackerData");
+    const data = localStorage.getItem('moodTrackerData');
     if (data) {
       try {
         moodData = JSON.parse(data);
       } catch (err) {
-        console.error("Error parsing mood data", err);
+        console.error('Error parsing mood data', err);
       }
     }
-    // Если данных нет, подставляем примерные
     if (moodData.length === 0) {
       moodData = [
-        { date: "2025-04-10", mood: "Happy", note: "Had a great day!" },
-        { date: "2025-04-11", mood: "Sad", note: "It was challenging." }
+        { date: '2025-04-10', mood: 'Happy', note: 'Had a great day!' },
+        { date: '2025-04-11', mood: 'Sad', note: 'It was challenging.' },
       ];
     }
 
-    // Выводим данные построчно
     let yOffset = 40;
     doc.setFontSize(12);
-    moodData.forEach((record, index) => {
+    moodData.forEach((record) => {
       const textLine = `${record.date}: ${record.mood} - ${record.note}`;
       doc.text(textLine, 20, yOffset);
       yOffset += 10;
-      // Если достигли нижней границы страницы, создаём новую
       if (yOffset > 280) {
         doc.addPage();
         yOffset = 20;
       }
     });
 
-    // Дополнительное оформление можно добавить здесь (например, линии, таблицы, графику)
-    doc.save("mood-report.pdf");
-    addMessage({ sender: 'system', text: "Mood Tracker Report generated and downloaded." });
+    doc.save('mood-report.pdf');
+    addMessage({ sender: 'system', text: 'Отчёт по Mood Tracker сгенерирован и сохранён.' });
     setOpen(false);
   };
 
-  // Обработка текста, введённого пользователем
+  // Симуляция генерации Project Analytics
+  const handleGenerateProjectReport = () => {
+    addMessage({ sender: 'system', text: 'Генерирую аналитику по вашим проектам...' });
+    // Здесь можно добавить получение и обработку данных трэкера проектов.
+    setTimeout(() => {
+      addMessage({
+        sender: 'system',
+        text: 'Project Analytics: Ваши проекты движутся в правильном направлении, однако стоит обратить внимание на распределение задач между участниками.',
+      });
+    }, 1000);
+  };
+
+  // Симуляция генерации Goals Analytics
+  const handleGenerateGoalsReport = () => {
+    addMessage({ sender: 'system', text: 'Генерирую аналитику по вашим целям...' });
+    // Здесь можно добавить получение и обработку данных трэкера целей.
+    setTimeout(() => {
+      addMessage({
+        sender: 'system',
+        text: 'Goals Analytics: Вы достигли значительного прогресса, но возможно стоит пересмотреть приоритеты для оптимизации результатов.',
+      });
+    }, 1000);
+  };
+
+  // Определение доступных опций трэкеров
+  const trackerOptions = [
+    { id: 'mood', name: 'Mood Report', callback: handleGenerateMoodReport },
+    { id: 'project', name: 'Project Report', callback: handleGenerateProjectReport },
+    { id: 'goals', name: 'Goals Report', callback: handleGenerateGoalsReport },
+  ];
+
+  // Обработка пользовательского ввода команды
   const handleSendMessage = () => {
     if (!userInput.trim()) return;
     addMessage({ sender: 'user', text: userInput });
-    // Простейшая обработка команд – если сообщение содержит слово "mood", запускается отчёт
-    if (userInput.toLowerCase().includes("mood")) {
-      addMessage({ sender: 'system', text: "Generating Mood Tracker Report..." });
+    const inputLower = userInput.trim().toLowerCase();
+
+    if (inputLower.includes('mood')) {
+      addMessage({ sender: 'system', text: 'Генерирую отчёт по Mood Tracker...' });
       handleGenerateMoodReport();
+    } else if (inputLower.includes('project')) {
+      addMessage({ sender: 'system', text: 'Генерирую аналитический отчёт по проектам...' });
+      handleGenerateProjectReport();
+    } else if (inputLower.includes('goal')) {
+      addMessage({ sender: 'system', text: 'Генерирую отчёт по целям...' });
+      handleGenerateGoalsReport();
     } else {
-      addMessage({ sender: 'system', text: "I'm sorry, I can currently generate only the Mood Tracker Report." });
+      addMessage({
+        sender: 'system',
+        text: 'Извини, я могу сгенерировать отчёты только для: Mood, Project и Goals.',
+      });
     }
-    setUserInput("");
+    setUserInput('');
   };
 
   return (
@@ -103,34 +144,45 @@ const FloatingChatGPT: React.FC = () => {
           </div>
           <div className="h-40 overflow-y-auto mb-2">
             {messages.map((msg, index) => (
-              <div key={index} className={`mb-1 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`text-sm ${msg.sender === 'user' ? 'text-blue-400' : 'text-gray-300'}`}>
+              <div
+                key={index}
+                className={`mb-1 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}
+              >
+                <span
+                  className={`text-sm ${msg.sender === 'user' ? 'text-blue-400' : 'text-gray-300'}`}
+                >
                   {msg.text}
                 </span>
               </div>
             ))}
           </div>
-          <div className="mb-2">
-            {/* Готовая кнопка для выбора отчёта по настроению */}
-            <button
-              onClick={() => {
-                addMessage({ sender: 'user', text: "Generate Mood Report" });
-                addMessage({ sender: 'system', text: "Generating Mood Tracker Report..." });
-                handleGenerateMoodReport();
-              }}
-              className="bg-green-600 px-3 py-1 rounded hover:bg-green-700 mr-2 text-sm"
-            >
-              Mood Report
-            </button>
+          
+          {/* Блок с выбором трэкера */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {trackerOptions.map((option, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  addMessage({ sender: 'user', text: option.name });
+                  option.callback();
+                }}
+                className="bg-green-600 px-3 py-1 rounded hover:bg-green-700 text-sm"
+              >
+                {option.name}
+              </button>
+            ))}
           </div>
+
           <div className="flex">
             <input
               type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              onKeyDown={(e) => { if(e.key === 'Enter') handleSendMessage() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSendMessage();
+              }}
               className="flex-1 bg-gray-700 p-2 rounded-l text-sm outline-none"
-              placeholder="Type a command..."
+              placeholder="Напиши команду..."
             />
             <button
               onClick={handleSendMessage}

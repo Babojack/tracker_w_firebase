@@ -12,26 +12,29 @@ import {
   ShoppingCart
 } from 'lucide-react';
 
+import LandingPage from './landingpage';  // Deine erweiterte LandingPage
+
 import ProjectTracker from './components/trackers/ProjectTracker';
 import GoalsTracker from './components/trackers/GoalsTracker';
 import MoodTracker from './components/trackers/MoodTracker';
 import LifeEQTracker from './components/trackers/LifeEQTracker';
 import TodoTracker from './components/trackers/TodoTracker';
 import HouseholdBudgetCalculator from './components/trackers/HouseholdBudgetCalculator';
-import WishlistTracker from './components/trackers/WishlistTracker';
+import WishlistTracker from './components/trackers/WishlistTracker'; // Fixed path
 import TravelPlanner from './components/trackers/TravelPlanner';
 import ShoppingListTracker from './components/trackers/ShoppingListTracker';
-
 import ProfileSettings from './components/ProfileSettings';
-import AuthComponent from './components/AuthComponent';
 import Dashboard from './components/Dashboard';
+
+// Dein ChatGPT-Widget
+import FloatingChatGPT from './components/trackers/FloatingChatGPT';
+
+// Firebase
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
-// Import FloatingChatGPT component
-import FloatingChatGPT from './components/trackers/FloatingChatGPT';
-
+// Typen für die Tabs
 type TabId =
   | 'dashboard'
   | 'projects'
@@ -44,13 +47,14 @@ type TabId =
   | 'travel'
   | 'shopping';
 
+// Interface für Tab-Daten
 interface Tab {
   id: TabId;
   name: string;
   Icon: React.FC<any>;
 }
 
-// ProfileMenu component definition
+// Profil-Menü (Avatar oben rechts)
 const ProfileMenu: React.FC<{
   onShowDashboard: () => void;
   onShowProfileSettings: () => void;
@@ -126,10 +130,17 @@ const App: React.FC = () => {
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Aktiver Tab (Dashboard, Projects usw.)
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+
+  // Steuert, ob wir das ProfileSettings-Panel zeigen
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+
+  // Für das mobile Menü
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // 1) Holen des eingeloggten Users via Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -138,6 +149,7 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // 2) Auslesen des URL-Params "tab" (z.B. ?tab=goals) und setzen des aktiven Tabs
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
@@ -161,6 +173,7 @@ const App: React.FC = () => {
     }
   }, [location.search]);
 
+  // 3) User-spezifische Einstellungen aus Firestore (z.B. letzter aktiver Tab)
   useEffect(() => {
     const fetchUserSettings = async () => {
       if (user) {
@@ -169,10 +182,12 @@ const App: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const tabParam = params.get('tab');
         if (!tabParam) {
+          // Falls kein ?tab= in der URL, laden wir den zuletzt gespeicherten Tab aus der DB
           if (settingsSnap.exists()) {
             const data = settingsSnap.data();
             if (data.activeTab) setActiveTab(data.activeTab);
           } else {
+            // Falls es noch keine Settings gibt, legen wir sie an
             await setDoc(settingsRef, { activeTab: 'dashboard' });
           }
         }
@@ -181,11 +196,13 @@ const App: React.FC = () => {
     fetchUserSettings();
   }, [user, location.search]);
 
+  // Klick auf einen Tab -> Tab aktivieren, URL updaten, Firestore updaten
   const handleTabClick = async (tabId: TabId) => {
     setActiveTab(tabId);
     setShowProfileSettings(false);
     setIsMobileMenuOpen(false);
     navigate(`/?tab=${tabId}`);
+
     if (user) {
       const settingsRef = doc(db, 'userSettings', user.uid);
       try {
@@ -196,17 +213,17 @@ const App: React.FC = () => {
     }
   };
 
+  // ProfileMenu-Aktionen
   const handleShowDashboard = () => handleTabClick('dashboard');
-
   const handleShowProfileSettings = () => {
     setShowProfileSettings(true);
-    navigate('/');
+    navigate('/'); // oder navigate('/?tab=dashboard') – wie du magst
   };
-
   const handleImportExport = () => {
-    alert('Import/Export logic goes here');
+    alert('Hier könnte man Import/Export-Logik implementieren!');
   };
 
+  // Ladezustand
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-white">
@@ -215,9 +232,12 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) return <AuthComponent />;
+  // **WENN NICHT EINGELOGGT -> LandingPage**
+  if (!user) {
+    return <LandingPage />;
+  }
 
-  // List of tabs
+  // **WENN EINGELOGGT -> Normaler "Tracker/Tab"-Bereich** 
   const tabs: Tab[] = [
     { id: 'dashboard', name: 'Dashboard', Icon: BarChart2 },
     { id: 'projects', name: 'Project Tracker', Icon: Activity },
@@ -234,6 +254,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-3 sm:p-4 md:p-6 relative">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Navigation */}
         <nav className="mb-4 sm:mb-6 md:mb-8">
           {/* MOBILE MENU */}
           <div className="md:hidden mb-4">
@@ -313,7 +335,7 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        {/* MAIN CONTENT AREA */}
+        {/* HAUPT-INHALT */}
         <div className="bg-gray-800/50 rounded-lg p-3 sm:p-4 md:p-6 min-h-[400px]">
           {showProfileSettings ? (
             <ProfileSettings />
@@ -333,8 +355,8 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
-      
-      {/* Floating ChatGPT Icon for PDF report generation */}
+
+      {/* Floating ChatGPT Icon/Window */}
       <FloatingChatGPT />
     </div>
   );

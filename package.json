@@ -11,10 +11,14 @@
     "test": "vitest"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "firebase": "^11.1.0",
     "jspdf": "^3.0.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.487.0",
+    "openai": "^4.94.0",
     "react": "^18.3.1",
     "react-datepicker": "^8.3.0",
     "react-dom": "^18.3.1",
