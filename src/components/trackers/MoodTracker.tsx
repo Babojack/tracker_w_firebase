@@ -4,6 +4,23 @@ import Note from '../shared/Note';
 import { db, auth } from '../../firebaseConfig';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 
+// Тип для активности
+interface Activity {
+  id: number;
+  label: string;
+  emoji: string;
+}
+
+// Массив возможных активностей (иконок) для записи
+const activityOptions: Activity[] = [
+  { id: 1, label: 'Book', emoji: '📚' },
+  { id: 2, label: 'Gaming', emoji: '🎮' },
+  { id: 3, label: 'Walking', emoji: '🚶‍♂️' },
+  { id: 4, label: 'Tasty Food', emoji: '🍕' },
+  { id: 5, label: 'Success', emoji: '🏆' },
+  // Добавляйте другие активности по необходимости
+];
+
 interface MoodEntry {
   id: string;
   mood: {
@@ -18,10 +35,12 @@ interface MoodEntry {
     text: string;
     timestamp: string;
   }[];
+  // Новое поле для активности (иконок)
+  activities?: Activity[];
   userId?: string;
 }
 
-// Updated moodLevels array including the new "Pattern" icon for pattern tracking
+// Настроения (moodLevels)
 const moodLevels = [
   { id: 6, label: 'Pattern', color: 'bg-purple-500', emoji: '🌀' },
   { id: 5, label: 'Excellent', color: 'bg-green-500', emoji: '😃' },
@@ -35,7 +54,7 @@ const MoodTracker: React.FC = () => {
   const [entries, setEntries] = useState<MoodEntry[]>([]);
   const [filter, setFilter] = useState<string>('all');
 
-  // Fetch entries for the current user from Firestore on mount
+  // Получаем записи пользователя из Firestore при монтировании компонента
   useEffect(() => {
     const fetchEntries = async () => {
       try {
@@ -57,13 +76,14 @@ const MoodTracker: React.FC = () => {
     fetchEntries();
   }, []);
 
-  // Add new entry to Firestore (with userId)
+  // Добавление нового настроения (mood) с пустым массивом активностей
   const addEntry = async (mood: typeof moodLevels[0]) => {
     try {
       const newEntry = {
         mood,
         timestamp: new Date().toISOString(),
         notes: [],
+        activities: [],
         userId: auth.currentUser ? auth.currentUser.uid : null,
       };
       const docRef = await addDoc(collection(db, "moodEntries"), newEntry);
@@ -73,7 +93,7 @@ const MoodTracker: React.FC = () => {
     }
   };
 
-  // Add note and update Firestore
+  // Функция для добавления новой заметки к записи и обновления Firestore
   const addNote = async (entryId: string, noteText: string) => {
     if (noteText.trim()) {
       const updatedEntries = entries.map(entry => {
@@ -101,7 +121,35 @@ const MoodTracker: React.FC = () => {
     }
   };
 
-  // Delete entry (locally and in Firestore)
+  // Функция для переключения активности: если уже выбрано — удаляет, если нет — добавляет
+  const toggleActivity = async (entryId: string, activity: Activity) => {
+    const updatedEntries = entries.map(entry => {
+      if (entry.id === entryId) {
+        let updatedActivities = entry.activities ? [...entry.activities] : [];
+        const exists = updatedActivities.some(a => a.id === activity.id);
+        if (exists) {
+          updatedActivities = updatedActivities.filter(a => a.id !== activity.id);
+        } else {
+          updatedActivities.push(activity);
+        }
+        return { ...entry, activities: updatedActivities };
+      }
+      return entry;
+    });
+    setEntries(updatedEntries);
+
+    try {
+      const entryToUpdate = updatedEntries.find(e => e.id === entryId);
+      if (entryToUpdate) {
+        const entryRef = doc(db, "moodEntries", entryId);
+        await updateDoc(entryRef, { activities: entryToUpdate.activities });
+      }
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Aktivitäten:", error);
+    }
+  };
+
+  // Удаление записи (локально и в Firestore)
   const deleteEntry = async (entryId: string) => {
     try {
       await deleteDoc(doc(db, "moodEntries", entryId));
@@ -117,7 +165,7 @@ const MoodTracker: React.FC = () => {
 
   return (
     <div className="w-full space-y-6 p-4">
-      {/* Header and Filter */}
+      {/* Header и фильтр */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl sm:text-2xl font-bold">Mood Tracker</h2>
         <div className="flex items-center space-x-2">
@@ -145,7 +193,7 @@ const MoodTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Mood Buttons */}
+      {/* Кнопки настроения */}
       <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2 sm:gap-4">
         {moodLevels.map(mood => (
           <button
@@ -162,7 +210,7 @@ const MoodTracker: React.FC = () => {
         ))}
       </div>
 
-      {/* Mood Entries */}
+      {/* Список записей настроения */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredEntries.map(entry => (
           <div
@@ -181,7 +229,7 @@ const MoodTracker: React.FC = () => {
                 </span>
                 <button
                   onClick={() => {
-                    if(window.confirm("Möchtest du diesen Eintrag wirklich löschen?")){
+                    if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
                       deleteEntry(entry.id);
                     }
                   }}
@@ -192,13 +240,30 @@ const MoodTracker: React.FC = () => {
               </div>
             </div>
 
-            {/* Note Input */}
+            {/* Панель выбора активности */}
+            <div className="flex space-x-2 mt-2">
+              {activityOptions.map(act => {
+                const isSelected = entry.activities && entry.activities.some(a => a.id === act.id);
+                return (
+                  <button
+                    key={act.id}
+                    onClick={() => toggleActivity(entry.id, act)}
+                    className={`p-2 rounded-full text-xl transition-colors ${
+                      isSelected ? 'bg-blue-600' : 'bg-gray-700'
+                    }`}
+                    title={act.label}
+                  >
+                    {act.emoji}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Поле для добавления заметок */}
             <input
               type="text"
               placeholder="Add a note and press Enter..."
-              className="w-full bg-gray-800 rounded p-2 mt-2 text-sm sm:text-base
-                placeholder:text-gray-500 focus:outline-none focus:ring-2
-                focus:ring-blue-500 transition-all"
+              className="w-full bg-gray-800 rounded p-2 mt-2 text-sm sm:text-base placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
                   addNote(entry.id, (e.target as HTMLInputElement).value);
@@ -207,7 +272,7 @@ const MoodTracker: React.FC = () => {
               }}
             />
 
-            {/* List of Notes */}
+            {/* Список заметок */}
             <div className="space-y-2 mt-2">
               {entry.notes && entry.notes.map(note => (
                 <Note

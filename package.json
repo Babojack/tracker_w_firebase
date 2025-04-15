@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "firebase": "^11.1.0",
+    "jspdf": "^3.0.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.487.0",
     "react": "^18.3.1",

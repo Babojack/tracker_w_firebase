@@ -24,12 +24,14 @@ import ShoppingListTracker from './components/trackers/ShoppingListTracker';
 
 import ProfileSettings from './components/ProfileSettings';
 import AuthComponent from './components/AuthComponent';
+import Dashboard from './components/Dashboard';
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
-import Dashboard from './components/Dashboard';
 
-// Erweitern des TabId-Typs um "shopping"
+// Import FloatingChatGPT component
+import FloatingChatGPT from './components/trackers/FloatingChatGPT';
+
 type TabId =
   | 'dashboard'
   | 'projects'
@@ -48,7 +50,7 @@ interface Tab {
   Icon: React.FC<any>;
 }
 
-// Profilmenü als eigenen Component
+// ProfileMenu component definition
 const ProfileMenu: React.FC<{
   onShowDashboard: () => void;
   onShowProfileSettings: () => void;
@@ -215,7 +217,7 @@ const App: React.FC = () => {
 
   if (!user) return <AuthComponent />;
 
-  // Liste aller Tabs
+  // List of tabs
   const tabs: Tab[] = [
     { id: 'dashboard', name: 'Dashboard', Icon: BarChart2 },
     { id: 'projects', name: 'Project Tracker', Icon: Activity },
@@ -230,10 +232,10 @@ const App: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-3 sm:p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-3 sm:p-4 md:p-6 relative">
       <div className="max-w-7xl mx-auto">
         <nav className="mb-4 sm:mb-6 md:mb-8">
-          {/* ========== MOBILES MENÜ ========== */}
+          {/* MOBILE MENU */}
           <div className="md:hidden mb-4">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -264,7 +266,6 @@ const App: React.FC = () => {
             </button>
             {isMobileMenuOpen && (
               <div className="mt-2 bg-gray-800/50 rounded-lg overflow-hidden">
-                {/* Tabs-Liste im mobilen Menü */}
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -277,8 +278,6 @@ const App: React.FC = () => {
                     <span>{tab.name}</span>
                   </button>
                 ))}
-
-                {/* Profilbild/Profil-Menü im mobilen Menü */}
                 <div className="flex justify-end p-2 border-t border-gray-700">
                   <ProfileMenu
                     onShowDashboard={handleShowDashboard}
@@ -290,9 +289,8 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* ========== DESKTOP MENÜ ========== */}
+          {/* DESKTOP MENU */}
           <div className="hidden md:flex items-center justify-between bg-gray-800/50 p-3 rounded-lg">
-            {/* Links: Tabs */}
             <div className="flex flex-wrap gap-2">
               {tabs.map((tab) => (
                 <button
@@ -307,8 +305,6 @@ const App: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            {/* Rechts: Profil-Menü */}
             <ProfileMenu
               onShowDashboard={handleShowDashboard}
               onShowProfileSettings={handleShowProfileSettings}
@@ -317,7 +313,7 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        {/* ========== HAUPTBEREICH ========== */}
+        {/* MAIN CONTENT AREA */}
         <div className="bg-gray-800/50 rounded-lg p-3 sm:p-4 md:p-6 min-h-[400px]">
           {showProfileSettings ? (
             <ProfileSettings />
@@ -337,6 +333,9 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
+      
+      {/* Floating ChatGPT Icon for PDF report generation */}
+      <FloatingChatGPT />
     </div>
   );
 };
