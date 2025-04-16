@@ -22,13 +22,13 @@ const LandingPage: React.FC = () => {
       title: 'Project Tracker',
       description: 'Organize your projects and track progress.',
       icon: <Activity size={32} />,
-      gif: 'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
+      gif: 'src/assets/projecttracker.gif',
     },
     {
       title: 'Goals Tracker',
       description: 'Set and achieve your goals step by step.',
       icon: <Target size={32} />,
-      gif: 'https://media.giphy.com/media/26gsl03QLUS4lnwOM/giphy.gif',
+      gif: 'src/assets/goals.gif',
     },
     {
       title: 'Mood Tracker',
@@ -127,7 +127,7 @@ const LandingPage: React.FC = () => {
           <div className="flex flex-col md:flex-row items-center">
             <div className="md:w-1/2 mb-6 md:mb-0 md:mr-8">
               <img
-                src="https://via.placeholder.com/600x400?text=Project+Tracker"
+                src="src/assets/projecttracker.gif"
                 alt="Project Tracker"
                 className="rounded shadow-lg"
               />
