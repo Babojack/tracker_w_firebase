@@ -1,115 +1,119 @@
-// landingpage.tsx
-
 import React, { useState } from 'react';
 import AuthComponent from './components/AuthComponent';
 
-// Wir importieren die Icons, die du auch im Dashboard verwendest.
-// Wenn du nicht alle brauchst, kannst du sie entfernen.
 import {
   Activity,    // Project Tracker
   Target,      // Goals Tracker
   BarChart2,   // Mood Tracker
-  Brain,       // LifeEQ
-  Plus,        // ToDo
-  Calculator,  // Budget
+  Brain,       // LifeEQ Tracker
+  Plus,        // ToDo's
+  Calculator,  // Household Budget
   Gift,        // Wishlist
-  Plane,       // Travel
+  Plane,       // Travel Planner
   ShoppingCart // Shopping List
 } from 'lucide-react';
 
 const LandingPage: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Hier definieren wir alle Module, ähnlich wie im Dashboard
+  // Define all modules in English with an added "gif" property for the backside content
   const modules = [
     {
       title: 'Project Tracker',
-      description: 'Organisiere deine Projekte und verfolge den Fortschritt.',
+      description: 'Organize your projects and track progress.',
       icon: <Activity size={32} />,
+      gif: 'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
     },
     {
       title: 'Goals Tracker',
-      description: 'Setze und erreiche deine Ziele Schritt für Schritt.',
+      description: 'Set and achieve your goals step by step.',
       icon: <Target size={32} />,
+      gif: 'https://media.giphy.com/media/26gsl03QLUS4lnwOM/giphy.gif',
     },
     {
       title: 'Mood Tracker',
-      description: 'Dokumentiere deine Stimmung und erkenne emotionale Muster.',
+      description: 'Document your mood and recognize emotional patterns.',
       icon: <BarChart2 size={32} />,
+      gif: 'https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif',
     },
     {
       title: 'LifeEQ Tracker',
-      description: 'Finde dein Gleichgewicht in allen Lebensbereichen.',
+      description: 'Find balance in all areas of your life.',
       icon: <Brain size={32} />,
+      gif: 'https://media.giphy.com/media/3orieWfIgbngFYwV8k/giphy.gif',
     },
     {
       title: "ToDo's",
-      description: 'Behalte Aufgaben im Blick und bleibe immer organisiert.',
+      description: 'Keep track of tasks and stay organized.',
       icon: <Plus size={32} />,
+      gif: 'https://media.giphy.com/media/10SvWCbt1ytWCc/giphy.gif',
     },
     {
       title: 'Household Budget',
-      description: 'Überwache deine Ein- und Ausgaben für einen klaren Überblick.',
+      description: 'Monitor your income and expenses for a clear overview.',
       icon: <Calculator size={32} />,
+      gif: 'https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif',
     },
     {
       title: 'Wishlist',
-      description: 'Halte deine Wünsche fest und plane deine Anschaffungen.',
+      description: 'Record your wishes and plan your purchases.',
       icon: <Gift size={32} />,
+      gif: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif',
     },
     {
       title: 'Travel Planner',
-      description: 'Plane deine Reisen effizient und stressfrei.',
+      description: 'Plan your trips efficiently and stress-free.',
       icon: <Plane size={32} />,
+      gif: 'https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif',
     },
     {
       title: 'Shopping List',
-      description: 'Erstelle Einkaufslisten und vergiss nie mehr etwas.',
+      description: 'Create shopping lists and never forget anything again.',
       icon: <ShoppingCart size={32} />,
+      gif: 'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif',
     },
   ];
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-      
       {/* Hero Section */}
       <header className="flex flex-col items-center justify-center flex-grow px-4 py-20 text-center">
         <h1 className="text-5xl font-bold mb-6">
-          Willkommen bei <span className="text-blue-500">MyTracker</span>
+          Welcome to <span className="text-blue-500">MyTracker</span>
         </h1>
         <p className="text-xl max-w-2xl text-gray-300 mb-8">
-          Deine All-in-One Plattform für Projekte, Ziele, Stimmung, Finanzen und vieles mehr.
-          Behalte dein Leben im Blick – an einem Ort!
+          Your all-in-one platform for projects, goals, mood, finances, and much more.
+          Keep your life in view – all in one place!
         </p>
         <button
           onClick={() => setShowAuthModal(true)}
           className="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-500 text-white font-semibold hover:from-purple-700 hover:to-blue-600 transition-colors"
         >
-          Jetzt loslegen
+          Get Started
         </button>
       </header>
 
       {/* Features Section */}
       <section className="bg-gray-800/50 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-8">Die Vorteile von MyTracker</h2>
+          <h2 className="text-3xl font-bold mb-8">The Advantages of MyTracker</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Alles an einem Ort</h3>
+              <h3 className="text-xl font-semibold mb-2">Everything in One Place</h3>
               <p className="text-gray-300">
-                Verwalte Projekte, Ziele, Stimmungstagebuch, Einkaufslisten und mehr – in einer App.
+                Manage projects, goals, mood journals, shopping lists, and more – all in one app.
               </p>
             </div>
             <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Intelligente Auswertungen</h3>
+              <h3 className="text-xl font-semibold mb-2">Intelligent Analytics</h3>
               <p className="text-gray-300">
-                Nutze integrierte Analytics (inkl. ChatGPT-Assistent), um Fortschritte und Trends zu erkennen.
+                Use integrated analytics (including a ChatGPT assistant) to track progress and identify trends.
               </p>
             </div>
             <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Flexibel & Sicher</h3>
+              <h3 className="text-xl font-semibold mb-2">Flexible & Secure</h3>
               <p className="text-gray-300">
-                Dank Cloud-Speicherung und Firebase-Auth hast du deine Daten überall verfügbar.
+                With cloud storage and Firebase-Auth, your data is available wherever you are.
               </p>
             </div>
           </div>
@@ -129,12 +133,12 @@ const LandingPage: React.FC = () => {
               />
             </div>
             <div className="md:w-1/2">
-              <h3 className="text-2xl font-bold mb-4">Projektverwaltung leicht gemacht</h3>
+              <h3 className="text-2xl font-bold mb-4">Project Management Made Easy</h3>
               <p className="text-gray-300 mb-4">
-                Behalte all deine Projekte im Blick, erstelle ToDos und messe deinen Fortschritt mit nur wenigen Klicks.
+                Keep track of all your projects, create ToDos, and measure your progress with just a few clicks.
               </p>
               <p className="text-gray-300">
-                Unser Tool hilft dir und deinem Team, strukturiert zu arbeiten – jederzeit und überall.
+                Our tool helps you and your team work in a structured way – anytime, anywhere.
               </p>
             </div>
           </div>
@@ -149,34 +153,44 @@ const LandingPage: React.FC = () => {
               />
             </div>
             <div className="md:w-1/2">
-              <h3 className="text-2xl font-bold mb-4">Tägliches Stimmungsbarometer</h3>
+              <h3 className="text-2xl font-bold mb-4">Daily Mood Barometer</h3>
               <p className="text-gray-300 mb-4">
-                Dokumentiere deine Stimmung, identifiziere Muster und verbessere dein Wohlbefinden mit persönlichen Insights.
+                Document your mood, identify patterns, and improve your well-being with personalized insights.
               </p>
               <p className="text-gray-300">
-                Dank unserer Auswertungstools behältst du deine emotionale Gesundheit stets im Fokus.
+                Our analytics tools ensure your emotional health always stays in focus.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* NEUE SEKTION: Übersicht aller Module/Tracker */}
+      {/* NEW SECTION: Overview of All Tracker Modules */}
       <section className="bg-gray-800/50 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-8">Alle Tracker-Module auf einen Blick</h2>
+          <h2 className="text-3xl font-bold mb-8">Overview of All Tracker Modules</h2>
           <p className="text-gray-300 max-w-2xl mx-auto mb-8">
-            Bei MyTracker findest du vielseitige Tools für jedes Lebensgebiet. Hier eine Übersicht unserer Module:
+            With MyTracker, you'll find versatile tools for every area of life. Here is an overview of our modules:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {modules.map((mod, index) => (
-              <div
-                key={index}
-                className="p-6 bg-gray-700/50 rounded-lg flex flex-col items-center text-center hover:shadow-xl transition-shadow"
-              >
-                <div className="mb-4 text-blue-400">{mod.icon}</div>
-                <h3 className="text-xl font-semibold mb-2">{mod.title}</h3>
-                <p className="text-gray-300">{mod.description}</p>
+              <div key={index} className="group [perspective:1000px] h-60">
+                <div className="relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                  {/* Front side */}
+                  <div className="absolute w-full h-full p-6 bg-gray-700/50 rounded-lg flex flex-col items-center text-center hover:shadow-xl transition-shadow [backface-visibility:hidden]">
+                    <div className="mb-4 text-blue-400">{mod.icon}</div>
+                    <h3 className="text-xl font-semibold mb-2">{mod.title}</h3>
+                    <p className="text-gray-300">{mod.description}</p>
+                  </div>
+                  {/* Back side with GIF */}
+                  <div className="absolute w-full h-full p-6 bg-gray-800 rounded-lg flex items-center justify-center [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                    <img
+                      src={mod.gif}
+                      alt={`${mod.title} GIF`}
+                      className="max-h-full max-w-full rounded-lg shadow-lg"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -185,10 +199,10 @@ const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="p-6 text-center bg-gray-900 text-gray-400">
-        <p>© 2025 MyTracker – Alle Rechte vorbehalten.</p>
+        <p>© 2025 MyTracker – All Rights Reserved.</p>
       </footer>
 
-      {/* Modal für Login/Register (wenn showAuthModal === true) */}
+      {/* Modal for Login/Register (when showAuthModal is true) */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-900 rounded-lg shadow-lg p-6 max-w-md w-full relative">
@@ -206,8 +220,7 @@ const LandingPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            
-            {/* Hier binden wir deinen AuthComponent ein */}
+            {/* Include your AuthComponent */}
             <AuthComponent />
           </div>
         </div>

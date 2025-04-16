@@ -64,3 +64,36 @@
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+/* Контейнер с перспективой */
+.flip-card {
+  perspective: 1000px;
+}
+
+/* Внутренний контейнер с плавным переворотом */
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+/* При наведении на контейнер переворачиваем его */
+.flip-card:hover .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+/* Общие стили для передней и задней сторон */
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+}
+
+/* Задняя сторона изначально скрыта и перевёрнута */
+.flip-card-back {
+  transform: rotateY(180deg);
+}
