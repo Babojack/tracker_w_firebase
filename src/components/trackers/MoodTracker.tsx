@@ -1,305 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import { X, Download, Upload } from 'lucide-react';
-import Note from '../shared/Note';
+// src/components/trackers/MoodTracker.tsx
+import React, { useEffect, useState } from 'react';
+import { X, Download } from 'lucide-react';
+import { collection, doc, query, where, getDocs, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
+import Note from '../shared/Note';
 
-// Тип для активности
-interface Activity {
-  id: number;
-  label: string;
-  emoji: string;
-}
+interface Activity { id: number; label: string; emoji: React.ReactNode }
 
-// Массив возможных активностей (иконок) для записи
 const activityOptions: Activity[] = [
-  { id: 1, label: 'Book', emoji: '📚' },
+  { id: 1, label: 'Reading', emoji: '📚' },
   { id: 2, label: 'Gaming', emoji: '🎮' },
   { id: 3, label: 'Walking', emoji: '🚶‍♂️' },
-  { id: 4, label: 'Tasty Food', emoji: '🍕' },
+  { id: 4, label: 'Food', emoji: '🍕' },
   { id: 5, label: 'Success', emoji: '🏆' },
-  // Добавляйте другие активности по необходимости
+  { id: 6, label: 'Workout', emoji: '🏃‍♂️' },
+  { id: 7, label: 'Illness', emoji: '🤒' },
+  { id: 8, label: 'Argument', emoji: '💢' },
+  { id: 9, label: 'Sunny', emoji: '☀️' },
+  { id: 10, label: 'Cloudy', emoji: '☁️' },
 ];
 
 interface MoodEntry {
   id: string;
-  mood: {
-    id: number;
-    label: string;
-    color: string;
-    emoji: string;
-  };
+  mood: { id: number; label: string; color: string; emoji: string };
   timestamp: string;
-  notes: {
-    id: string;
-    text: string;
-    timestamp: string;
-  }[];
-  // Новое поле для активности (иконок)
-  activities?: Activity[];
-  userId?: string;
+  notes: { id: string; text: string; timestamp: string }[];
+  activities: Activity[];
 }
 
-// Настроения (moodLevels)
 const moodLevels = [
   { id: 6, label: 'Pattern', color: 'bg-purple-500', emoji: '🌀' },
   { id: 5, label: 'Excellent', color: 'bg-green-500', emoji: '😃' },
   { id: 4, label: 'Good', color: 'bg-blue-500', emoji: '🙂' },
   { id: 3, label: 'Neutral', color: 'bg-yellow-500', emoji: '😐' },
   { id: 2, label: 'Poor', color: 'bg-orange-500', emoji: '🙁' },
-  { id: 1, label: 'Bad', color: 'bg-red-500', emoji: '😞' }
+  { id: 1, label: 'Bad', color: 'bg-red-500', emoji: '😞' },
 ];
 
 const MoodTracker: React.FC = () => {
   const [entries, setEntries] = useState<MoodEntry[]>([]);
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState('all');
 
-  // Получаем записи пользователя из Firestore при монтировании компонента
   useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        const entriesQuery = query(
-          collection(db, "moodEntries"),
-          where('userId', '==', auth.currentUser ? auth.currentUser.uid : '')
-        );
-        const querySnapshot = await getDocs(entriesQuery);
-        const moodEntries: MoodEntry[] = [];
-        querySnapshot.forEach((document) => {
-          moodEntries.push({ id: document.id, ...document.data() } as MoodEntry);
+    const load = async () => {
+      const q = query(collection(db, 'moodEntries'), where('userId', '==', auth.currentUser?.uid || ''));
+      const snap = await getDocs(q);
+      const data: MoodEntry[] = [];
+      snap.forEach(d => {
+        const docData = d.data();
+        data.push({
+          id: d.id,
+          mood: docData.mood,
+          timestamp: docData.timestamp,
+          notes: docData.notes || [],
+          activities: docData.activities || []
         });
-        setEntries(moodEntries);
-      } catch (error) {
-        console.error("Fehler beim Laden der Einträge:", error);
-      }
+      });
+      setEntries(data);
     };
-
-    fetchEntries();
+    load();
   }, []);
 
-  // Добавление нового настроения (mood) с пустым массивом активностей
-  const addEntry = async (mood: typeof moodLevels[0]) => {
-    try {
-      const newEntry = {
-        mood,
-        timestamp: new Date().toISOString(),
-        notes: [],
-        activities: [],
-        userId: auth.currentUser ? auth.currentUser.uid : null,
-      };
-      const docRef = await addDoc(collection(db, "moodEntries"), newEntry);
-      setEntries([{ id: docRef.id, ...newEntry } as MoodEntry, ...entries]);
-    } catch (error) {
-      console.error("Fehler beim Hinzufügen des Eintrags:", error);
-    }
+  const pushEntry = async (mood: typeof moodLevels[0]) => {
+    const entry = { mood, timestamp: new Date().toISOString(), notes: [], activities: [], userId: auth.currentUser?.uid };
+    const ref = await addDoc(collection(db, 'moodEntries'), entry);
+    setEntries([{ id: ref.id, ...entry }, ...entries]);
   };
 
-  // Функция для добавления новой заметки к записи и обновления Firestore
-  const addNote = async (entryId: string, noteText: string) => {
-    if (noteText.trim()) {
-      const updatedEntries = entries.map(entry => {
-        if (entry.id === entryId) {
-          const newNote = {
-            id: Date.now().toString(),
-            text: noteText.trim(),
-            timestamp: new Date().toISOString()
-          };
-          return { ...entry, notes: [...(entry.notes || []), newNote] };
-        }
-        return entry;
-      });
-      setEntries(updatedEntries);
-
-      try {
-        const entryRef = doc(db, "moodEntries", entryId);
-        const entryToUpdate = updatedEntries.find(e => e.id === entryId);
-        if (entryToUpdate) {
-          await updateDoc(entryRef, { notes: entryToUpdate.notes });
-        }
-      } catch (error) {
-        console.error("Fehler beim Hinzufügen der Notiz:", error);
-      }
-    }
+  const pushNote = async (eid: string, text: string) => {
+    if (!text.trim()) return;
+    const upd = entries.map(e =>
+      e.id === eid ? { ...e, notes: [...e.notes, { id: Date.now().toString(), text, timestamp: new Date().toISOString() }] } : e
+    );
+    setEntries(upd);
+    const item = upd.find(e => e.id === eid);
+    if (item) await updateDoc(doc(db, 'moodEntries', eid), { notes: item.notes });
   };
 
-  // Функция для переключения активности: если уже выбрано — удаляет, если нет — добавляет
-  const toggleActivity = async (entryId: string, activity: Activity) => {
-    const updatedEntries = entries.map(entry => {
-      if (entry.id === entryId) {
-        let updatedActivities = entry.activities ? [...entry.activities] : [];
-        const exists = updatedActivities.some(a => a.id === activity.id);
-        if (exists) {
-          updatedActivities = updatedActivities.filter(a => a.id !== activity.id);
-        } else {
-          updatedActivities.push(activity);
-        }
-        return { ...entry, activities: updatedActivities };
-      }
-      return entry;
+  const toggleAct = async (eid: string, act: Activity) => {
+    const upd = entries.map(e => {
+      if (e.id !== eid) return e;
+      const list = e.activities.some(a => a.id === act.id) ? e.activities.filter(a => a.id !== act.id) : [...e.activities, act];
+      return { ...e, activities: list };
     });
-    setEntries(updatedEntries);
-
-    try {
-      const entryToUpdate = updatedEntries.find(e => e.id === entryId);
-      if (entryToUpdate) {
-        const entryRef = doc(db, "moodEntries", entryId);
-        await updateDoc(entryRef, { activities: entryToUpdate.activities });
-      }
-    } catch (error) {
-      console.error("Fehler beim Aktualisieren der Aktivitäten:", error);
-    }
+    setEntries(upd);
+    const item = upd.find(e => e.id === eid);
+    if (item) await updateDoc(doc(db, 'moodEntries', eid), { activities: item.activities });
   };
 
-  // Удаление записи (локально и в Firestore)
-  const deleteEntry = async (entryId: string) => {
-    try {
-      await deleteDoc(doc(db, "moodEntries", entryId));
-      setEntries(entries.filter(e => e.id !== entryId));
-    } catch (error) {
-      console.error("Fehler beim Löschen des Eintrags:", error);
-    }
+  const dropEntry = async (id: string) => {
+    await deleteDoc(doc(db, 'moodEntries', id));
+    setEntries(entries.filter(e => e.id !== id));
   };
 
-  const filteredEntries = filter === 'all'
-    ? entries
-    : entries.filter(entry => entry.mood.id === parseInt(filter));
+  const sorted = (filter === 'all' ? entries : entries.filter(e => e.mood.id === +filter)).sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   return (
     <div className="w-full space-y-6 p-4">
-      {/* Header и фильтр */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold">Mood Tracker</h2>
-        <div className="flex items-center space-x-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full sm:w-auto bg-gray-800 p-2 rounded text-sm sm:text-base"
-          >
-            <option value="all">All Moods</option>
-            {moodLevels.map(mood => (
-              <option key={mood.id} value={mood.id}>
-                {mood.label} Only
+      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+        <h2 className="text-2xl font-bold">Mood Tracker</h2>
+        <div className="flex gap-2">
+          <select value={filter} onChange={e => setFilter(e.target.value)} className="bg-gray-800 p-2 rounded">
+            <option value="all">All</option>
+            {moodLevels.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.label}
               </option>
             ))}
           </select>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => console.log("Export funktioniert hier noch nur lokal!")}
-              className="flex items-center space-x-1 p-2 bg-green-500 rounded-lg hover:bg-green-600 transition-colors"
-              title="Export Entries"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </div>
+          <button className="p-2 bg-green-500 rounded"><Download className="w-4 h-4" /></button>
         </div>
       </div>
 
-      {/* Кнопки настроения */}
-      <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2 sm:gap-4">
-        {moodLevels.map(mood => (
-          <button
-            key={mood.id}
-            onClick={() => addEntry(mood)}
-            className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full transition-all
-              hover:opacity-80 ${mood.color} flex items-center justify-center
-              text-xl sm:text-2xl shadow-lg hover:scale-110
-              active:scale-95 transform duration-150`}
-            title={mood.label}
-          >
-            {mood.emoji}
+      <div className="flex flex-wrap justify-center gap-3">
+        {moodLevels.map(m => (
+          <button key={m.id} onClick={() => pushEntry(m)} className={`w-14 h-14 rounded-full ${m.color} flex items-center justify-center text-2xl`}>
+            {m.emoji}
           </button>
         ))}
       </div>
 
-      {/* Список записей настроения */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredEntries.map(entry => (
-          <div
-            key={entry.id}
-            className={`p-3 sm:p-4 rounded-lg ${entry.mood.color} bg-opacity-20
-              backdrop-blur-sm transition-all duration-300 hover:bg-opacity-25`}
-          >
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-2">
-              <div className="flex items-center space-x-2">
-                <span className="text-xl sm:text-2xl">{entry.mood.emoji}</span>
-                <span className="font-medium text-sm sm:text-base">{entry.mood.label}</span>
+        {sorted.map(e => (
+          <div key={e.id} className={`p-4 rounded-lg ${e.mood.color} bg-opacity-20`}>
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-2"><span className="text-2xl">{e.mood.emoji}</span><span>{e.mood.label}</span></div>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                {new Date(e.timestamp).toLocaleString()}
+                <button onClick={() => dropEntry(e.id)} className="p-1"><X className="w-4 h-4" /></button>
               </div>
-              <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
-                <span className="text-xs sm:text-sm text-gray-300">
-                  {new Date(entry.timestamp).toLocaleString()}
-                </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-2">
+              {activityOptions.map(a => (
                 <button
-                  onClick={() => {
-                    if (window.confirm("Möchtest du diesen Eintrag wirklich löschen?")) {
-                      deleteEntry(entry.id);
-                    }
-                  }}
-                  className="p-1 hover:bg-gray-600 rounded transition-colors"
-                >
-                  <X className="w-4 h-4" />
+                  key={a.id}
+                  onClick={() => toggleAct(e.id, a)}
+                  className={`p-2 rounded-full text-xl ${e.activities.some(x => x.id === a.id) ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                  {a.emoji}
                 </button>
-              </div>
+              ))}
             </div>
 
-            {/* Панель выбора активности */}
-            <div className="flex space-x-2 mt-2">
-              {activityOptions.map(act => {
-                const isSelected = entry.activities && entry.activities.some(a => a.id === act.id);
-                return (
-                  <button
-                    key={act.id}
-                    onClick={() => toggleActivity(entry.id, act)}
-                    className={`p-2 rounded-full text-xl transition-colors ${
-                      isSelected ? 'bg-blue-600' : 'bg-gray-700'
-                    }`}
-                    title={act.label}
-                  >
-                    {act.emoji}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Поле для добавления заметок */}
             <input
-              type="text"
-              placeholder="Add a note and press Enter..."
-              className="w-full bg-gray-800 rounded p-2 mt-2 text-sm sm:text-base placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                  addNote(entry.id, (e.target as HTMLInputElement).value);
-                  (e.target as HTMLInputElement).value = '';
+              placeholder="Add a note..."
+              className="w-full bg-gray-800 rounded p-2 text-sm"
+              onKeyDown={ev => {
+                if (ev.key === 'Enter') {
+                  pushNote(e.id, (ev.target as HTMLInputElement).value);
+                  (ev.target as HTMLInputElement).value = '';
                 }
               }}
             />
 
-            {/* Список заметок */}
             <div className="space-y-2 mt-2">
-              {entry.notes && entry.notes.map(note => (
-                <Note
-                  key={note.id}
-                  note={note}
-                  onDelete={() => {
-                    const updatedEntries = entries.map(e => ({
-                      ...e,
-                      notes: e.id === entry.id
-                        ? e.notes.filter(n => n.id !== note.id)
-                        : e.notes
-                    }));
-                    setEntries(updatedEntries);
-                  }}
-                />
+              {e.notes.map(n => (
+                <Note key={n.id} note={n} onDelete={() => setEntries(entries.map(en => ({ ...en, notes: en.notes.filter(nn => nn.id !== n.id) })))} />
               ))}
             </div>
           </div>
         ))}
       </div>
 
-      {filteredEntries.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
-          <p className="text-lg">No mood entries yet.</p>
-          <p className="text-sm mt-2">Click on any mood button above to start tracking!</p>
-        </div>
-      )}
+      {sorted.length === 0 && <p className="text-center text-gray-400">No entries yet.</p>}
     </div>
   );
 };
