@@ -1,12 +1,20 @@
+
 import React, { useState } from 'react';
 import { auth } from './firebaseConfig';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  setPersistence,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  inMemoryPersistence,
+} from 'firebase/auth';
 import { Link, useNavigate } from 'react-router-dom';
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
@@ -14,23 +22,30 @@ const SignUp: React.FC = () => {
     confirmPassword: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const change = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const ensurePersistence = async () => {
+    await setPersistence(auth, indexedDBLocalPersistence)
+      .catch(() => setPersistence(auth, browserLocalPersistence))
+      .catch(() => setPersistence(auth, inMemoryPersistence));
+  };
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (formData.password !== formData.confirmPassword) {
+    if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
     try {
-      const cred = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      await ensurePersistence();
+      const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
       if (cred.user)
-        await updateProfile(cred.user, { displayName: `${formData.firstName} ${formData.lastName}` });
+        await updateProfile(cred.user, { displayName: `${form.firstName} ${form.lastName}` });
       navigate('/app?tab=dashboard', { replace: true });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (e: any) {
+      setError(e.message);
     }
   };
 
@@ -40,14 +55,15 @@ const SignUp: React.FC = () => {
         <div className="max-w-sm w-full p-8">
           <h2 className="text-3xl font-bold text-center mb-6">Create your Account</h2>
           {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <form onSubmit={submit} className="space-y-4">
             <div className="flex space-x-4">
               <input
                 type="text"
                 name="firstName"
                 placeholder="First Name"
-                value={formData.firstName}
-                onChange={handleChange}
+                value={form.firstName}
+                onChange={change}
                 required
                 className="w-1/2 px-4 py-2 rounded bg-white border border-gray-300 focus:ring-purple-500"
               />
@@ -55,8 +71,8 @@ const SignUp: React.FC = () => {
                 type="text"
                 name="lastName"
                 placeholder="Last Name"
-                value={formData.lastName}
-                onChange={handleChange}
+                value={form.lastName}
+                onChange={change}
                 required
                 className="w-1/2 px-4 py-2 rounded bg-white border border-gray-300 focus:ring-purple-500"
               />
@@ -65,8 +81,8 @@ const SignUp: React.FC = () => {
               type="email"
               name="email"
               placeholder="Email"
-              value={formData.email}
-              onChange={handleChange}
+              value={form.email}
+              onChange={change}
               required
               className="w-full px-4 py-2 rounded bg-white border border-gray-300 focus:ring-purple-500"
             />
@@ -74,8 +90,8 @@ const SignUp: React.FC = () => {
               type="password"
               name="password"
               placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
+              value={form.password}
+              onChange={change}
               required
               className="w-full px-4 py-2 rounded bg-white border border-gray-300 focus:ring-purple-500"
             />
@@ -83,11 +99,12 @@ const SignUp: React.FC = () => {
               type="password"
               name="confirmPassword"
               placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
+              value={form.confirmPassword}
+              onChange={change}
               required
               className="w-full px-4 py-2 rounded bg-white border border-gray-300 focus:ring-purple-500"
             />
+
             <button
               type="submit"
               className="w-full py-2 rounded bg-gradient-to-r from-purple-600 to-blue-500 text-white font-semibold hover:from-purple-700 hover:to-blue-600"
@@ -95,6 +112,7 @@ const SignUp: React.FC = () => {
               Sign Up
             </button>
           </form>
+
           <div className="mt-4 text-center text-gray-700">
             Already have an account?{' '}
             <Link to="/signin" className="text-purple-600 hover:underline">
@@ -103,12 +121,13 @@ const SignUp: React.FC = () => {
           </div>
         </div>
       </div>
+
       <div className="hidden md:flex w-full md:w-1/2 flex-col items-center justify-center bg-gradient-to-r from-purple-800 to-purple-600 p-10 text-white animate-slideIn">
         <h1 className="text-4xl font-bold mb-4 text-center">Welcome to MyTracker</h1>
         <p className="mb-6 text-lg max-w-md text-center">
-          Create an account and discover how easy organization can be – all your tasks, goals, and finances in one place.
+          Create an account and discover how easy organization can be – all your tasks, goals, and finances in one place.
         </p>
-        <p className="text-sm text-gray-200">Trusted by over 500,000 users worldwide – free of charge.</p>
+        <p className="text-sm text-gray-200">Trusted by over 500 000 users worldwide – free of charge.</p>
       </div>
     </div>
   );

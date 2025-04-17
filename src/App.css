@@ -146,3 +146,32 @@
 .animate-slideIn {
   animation: slideIn 0.6s ease-out forwards;
 }
+
+/* ---------- honey‑comb layout ---------- */
+.honeycomb{
+  --size: 140px;               /* width of each hex */
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size),1fr));
+  gap:20px;
+  padding-bottom: calc(var(--size)*0.29); /* bottom offset for last row */
+}
+.hex{
+  position:relative;
+  width:var(--size);
+  aspect-ratio:1;
+  clip-path:polygon(
+    25% 6.7%, 75% 6.7%, 100% 50%,
+    75% 93.3%, 25% 93.3%, 0% 50%
+  );
+  background:#1f2937;          /* gray‑800 */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  transition:all .25s ease;
+}
+.hex-content{padding:16px; display:flex; flex-direction:column; align-items:center;}
+/* shift every even row to get honeycomb effect */
+@supports (transform:translateY(0)) {
+  .honeycomb > :nth-child(odd)   { transform:translateY(calc(var(--size)*0.29)); }
+}
