@@ -1,232 +1,171 @@
-import React, { useState } from 'react';
-import AuthComponent from './components/AuthComponent';
-
+// src/LandingPage.tsx
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import './flipcard.css';
 import {
-  Activity,    // Project Tracker
-  Target,      // Goals Tracker
-  BarChart2,   // Mood Tracker
-  Brain,       // LifeEQ Tracker
-  Plus,        // ToDo's
-  Calculator,  // Household Budget
-  Gift,        // Wishlist
-  Plane,       // Travel Planner
-  ShoppingCart // Shopping List
+  Activity,
+  Target,
+  BarChart2,
+  Brain,
+  Plus,
+  Calculator,
+  Gift,
+  Plane,
+  ShoppingCart,
+  User,
+  Box,
+  BarChart3,
+  Clock,
+  CheckCircle2,
+  BookOpenCheck,
+  BedDouble,
 } from 'lucide-react';
 
-const LandingPage: React.FC = () => {
-  const [showAuthModal, setShowAuthModal] = useState(false);
+const modules = [
+  { title: 'Project Tracker',  description: 'Organize projects & milestones.',       icon: <Activity size={32} />,  gif: 'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' },
+  { title: 'Goals Tracker',    description: 'Set and achieve measurable goals.',     icon: <Target size={32} />,    gif: 'https://media.giphy.com/media/26gsl03QLUS4lnwOM/giphy.gif' },
+  { title: 'Mood Tracker',     description: 'Log mood & spot emotional patterns.',  icon: <BarChart2 size={32} />, gif: 'https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif' },
+  { title: 'LifeEQ Tracker',   description: 'Keep overall life balance in check.',  icon: <Brain size={32} />,     gif: 'https://media.giphy.com/media/3orieWfIgbngFYwV8k/giphy.gif' },
+  { title: "ToDo's Tracker",   description: 'Tame your task list & beat chaos.',     icon: <Plus size={32} />,      gif: 'https://media.giphy.com/media/10SvWCbt1ytWCc/giphy.gif' },
+  { title: 'Household Budget', description: 'Track income, expenses & balance.',    icon: <Calculator size={32} />,gif: 'https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif' },
+  { title: 'Wishlist Tracker', description: 'Plan purchases & stay motivated.',     icon: <Gift size={32} />,      gif: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif' },
+  { title: 'Travel Planner',   description: 'Plan trips stress‑free & on budget.',  icon: <Plane size={32} />,     gif: 'https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif' },
+  { title: 'Shopping List',    description: 'Never forget an item again.',          icon: <ShoppingCart size={32} />,gif:'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif' },
+];
 
-  // Define all modules in English with an added "gif" property for the backside content
-  const modules = [
-    {
-      title: 'Project Tracker',
-      description: 'Organize your projects and track progress.',
-      icon: <Activity size={32} />,
-      gif: 'src/assets/projecttracker.gif',
-    },
-    {
-      title: 'Goals Tracker',
-      description: 'Set and achieve your goals step by step.',
-      icon: <Target size={32} />,
-      gif: 'src/assets/goals.gif',
-    },
-    {
-      title: 'Mood Tracker',
-      description: 'Document your mood and recognize emotional patterns.',
-      icon: <BarChart2 size={32} />,
-      gif: 'https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif',
-    },
-    {
-      title: 'LifeEQ Tracker',
-      description: 'Find balance in all areas of your life.',
-      icon: <Brain size={32} />,
-      gif: 'https://media.giphy.com/media/3orieWfIgbngFYwV8k/giphy.gif',
-    },
-    {
-      title: "ToDo's",
-      description: 'Keep track of tasks and stay organized.',
-      icon: <Plus size={32} />,
-      gif: 'https://media.giphy.com/media/10SvWCbt1ytWCc/giphy.gif',
-    },
-    {
-      title: 'Household Budget',
-      description: 'Monitor your income and expenses for a clear overview.',
-      icon: <Calculator size={32} />,
-      gif: 'https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif',
-    },
-    {
-      title: 'Wishlist',
-      description: 'Record your wishes and plan your purchases.',
-      icon: <Gift size={32} />,
-      gif: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif',
-    },
-    {
-      title: 'Travel Planner',
-      description: 'Plan your trips efficiently and stress-free.',
-      icon: <Plane size={32} />,
-      gif: 'https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif',
-    },
-    {
-      title: 'Shopping List',
-      description: 'Create shopping lists and never forget anything again.',
-      icon: <ShoppingCart size={32} />,
-      gif: 'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif',
-    },
-  ];
+const stats = [
+  { icon: <User size={40} className="text-blue-400" />, value: '100K+', label: 'Neurodiverse Users' },
+  { icon: <Box size={40} className="text-blue-400" />, value: '9',      label: 'Integrated Trackers' },
+  { icon: <BarChart3 size={40} className="text-blue-400" />, value: '24/7', label: 'Cloud Sync' },
+];
 
-  return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-      {/* Hero Section */}
-      <header className="flex flex-col items-center justify-center flex-grow px-4 py-20 text-center">
-        <h1 className="text-5xl font-bold mb-6">
-          Welcome to <span className="text-blue-500">MyTracker</span>
-        </h1>
-        <p className="text-xl max-w-2xl text-gray-300 mb-8">
-          Your all-in-one platform for projects, goals, mood, finances, and much more.
-          Keep your life in view – all in one place!
-        </p>
-        <button
-          onClick={() => setShowAuthModal(true)}
-          className="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-500 text-white font-semibold hover:from-purple-700 hover:to-blue-600 transition-colors"
-        >
-          Get Started
-        </button>
-      </header>
+const testimonials = [
+  { quote: 'MyTracker finally gave my ADHD brain structure without killing creativity!', author: 'Alice, Designer' },
+  { quote: 'The daily focus timer keeps me on track every single hour.', author: 'Ben, Developer' },
+  { quote: 'Mood analytics helped me notice burnout weeks before it hit.', author: 'Clara, Writer' },
+];
 
-      {/* Features Section */}
-      <section className="bg-gray-800/50 py-12 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-8">The Advantages of MyTracker</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Everything in One Place</h3>
-              <p className="text-gray-300">
-                Manage projects, goals, mood journals, shopping lists, and more – all in one app.
-              </p>
-            </div>
-            <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Intelligent Analytics</h3>
-              <p className="text-gray-300">
-                Use integrated analytics (including a ChatGPT assistant) to track progress and identify trends.
-              </p>
-            </div>
-            <div className="p-6 bg-gray-700/50 rounded-lg">
-              <h3 className="text-xl font-semibold mb-2">Flexible & Secure</h3>
-              <p className="text-gray-300">
-                With cloud storage and Firebase-Auth, your data is available wherever you are.
-              </p>
-            </div>
-          </div>
+const timeline = [
+  { time: '07:00', title: 'Morning Snapshot',   desc: 'Quick mood log & review today’s goals.',          icon: <Clock size={20}/> },
+  { time: '09:00', title: 'Deep‑Work Block',    desc: 'Start Focus Timer in Project Tracker.',           icon: <BookOpenCheck size={20}/> },
+  { time: '12:30', title: 'Lunch & Reflect',    desc: 'Update Mood, tick completed tasks.',             icon: <CheckCircle2 size={20}/> },
+  { time: '15:00', title: 'Budget Check‑in',    desc: 'Log any expenses, update balance.',              icon: <Calculator size={20}/> },
+  { time: '18:00', title: 'Evening Wind‑Down',  desc: 'Review progress & plan tomorrow.',              icon: <Target size={20}/> },
+  { time: '22:30', title: 'Sleep & Sync',       desc: 'All data auto‑syncs. Time to rest.',             icon: <BedDouble size={20}/> },
+];
+
+const containerVariants = { hidden: {}, show: { transition: { staggerChildren: 0.2 } } };
+const fadeInUp           = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.6 } } };
+
+const LandingPage: React.FC = () => (
+  <motion.div initial="hidden" animate="show" variants={containerVariants} className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+
+    <motion.section variants={fadeInUp} className="text-center py-20 px-4">
+      <h1 className="text-5xl font-bold mb-4">Built for <span className="text-blue-500">brains that bounce</span></h1>
+      <p className="text-xl max-w-2xl mx-auto text-gray-300 mb-8">
+        One unified dashboard for focus, finances, feelings — designed with ADHD & Autistic brains in mind.
+      </p>
+      <Link to="/signup" className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600">
+        Try it Free
+      </Link>
+    </motion.section>
+
+    {/* Why MyTracker */}
+    <motion.section variants={fadeInUp} className="bg-gray-800/50 py-12 px-4">
+      <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
+        <div>
+          <h2 className="text-3xl font-bold mb-4">Why MyTracker?</h2>
+          <ul className="list-disc list-inside space-y-3 text-gray-300">
+            <li><b>Zero context‑switching.</b> All life‑areas live in one clean screen.</li>
+            <li><b>Brain‑friendly UI.</b> Big buttons, calm colors, no information overload.</li>
+            <li><b>Instant dopamine hits.</b> Micro‑rewards & colourful progress bars.</li>
+            <li><b>Data that helps.</b> Mood heatmaps, budget trends, project burndown.</li>
+            <li><b>Built by neurodiverse devs.</b> We use these tools every day ourselves.</li>
+          </ul>
         </div>
-      </section>
-
-      {/* Showcase Section */}
-      <section className="py-12 px-4">
-        <div className="max-w-6xl mx-auto space-y-12">
-          {/* Block 1 */}
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2 mb-6 md:mb-0 md:mr-8">
-              <img
-                src="src/assets/projecttracker.gif"
-                alt="Project Tracker"
-                className="rounded shadow-lg"
-              />
-            </div>
-            <div className="md:w-1/2">
-              <h3 className="text-2xl font-bold mb-4">Project Management Made Easy</h3>
-              <p className="text-gray-300 mb-4">
-                Keep track of all your projects, create ToDos, and measure your progress with just a few clicks.
-              </p>
-              <p className="text-gray-300">
-                Our tool helps you and your team work in a structured way – anytime, anywhere.
-              </p>
-            </div>
-          </div>
-
-          {/* Block 2 */}
-          <div className="flex flex-col md:flex-row-reverse items-center">
-            <div className="md:w-1/2 mb-6 md:mb-0 md:ml-8">
-              <img
-                src="https://via.placeholder.com/600x400?text=Mood+Tracker"
-                alt="Mood Tracker"
-                className="rounded shadow-lg"
-              />
-            </div>
-            <div className="md:w-1/2">
-              <h3 className="text-2xl font-bold mb-4">Daily Mood Barometer</h3>
-              <p className="text-gray-300 mb-4">
-                Document your mood, identify patterns, and improve your well-being with personalized insights.
-              </p>
-              <p className="text-gray-300">
-                Our analytics tools ensure your emotional health always stays in focus.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* NEW SECTION: Overview of All Tracker Modules */}
-      <section className="bg-gray-800/50 py-12 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-8">Overview of All Tracker Modules</h2>
-          <p className="text-gray-300 max-w-2xl mx-auto mb-8">
-            With MyTracker, you'll find versatile tools for every area of life. Here is an overview of our modules:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            {modules.map((mod, index) => (
-              <div key={index} className="group [perspective:1000px] h-60">
-                <div className="relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
-                  {/* Front side */}
-                  <div className="absolute w-full h-full p-6 bg-gray-700/50 rounded-lg flex flex-col items-center text-center hover:shadow-xl transition-shadow [backface-visibility:hidden]">
-                    <div className="mb-4 text-blue-400">{mod.icon}</div>
-                    <h3 className="text-xl font-semibold mb-2">{mod.title}</h3>
-                    <p className="text-gray-300">{mod.description}</p>
-                  </div>
-                  {/* Back side with GIF */}
-                  <div className="absolute w-full h-full p-6 bg-gray-800 rounded-lg flex items-center justify-center [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                    <img
-                      src={mod.gif}
-                      alt={`${mod.title} GIF`}
-                      className="max-h-full max-w-full rounded-lg shadow-lg"
-                    />
-                  </div>
+        <div className="bg-gray-900/60 rounded-lg p-6">
+          <h3 className="text-2xl font-semibold mb-4 flex items-center gap-2"><Clock size={24}/> Daily Flow (24‑hour guide)</h3>
+          <ol className="space-y-3">
+            {timeline.map(step => (
+              <li key={step.time} className="flex items-start gap-3">
+                <span className="text-purple-400 w-14">{step.time}</span>
+                <span className="text-purple-300">{step.icon}</span>
+                <div>
+                  <p className="font-semibold">{step.title}</p>
+                  <p className="text-gray-400 text-sm">{step.desc}</p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
-      </section>
+      </div>
+    </motion.section>
 
-      {/* Footer */}
-      <footer className="p-6 text-center bg-gray-900 text-gray-400">
-        <p>© 2025 MyTracker – All Rights Reserved.</p>
-      </footer>
+    {/* Stats */}
+    <motion.section variants={fadeInUp} className="py-12 px-4">
+      <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+        {stats.map((s, i) => (
+          <motion.div key={i} variants={fadeInUp} className="flex flex-col items-center">
+            {s.icon}
+            <span className="text-3xl font-bold mt-2">{s.value}</span>
+            <span className="text-gray-400">{s.label}</span>
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
 
-      {/* Modal for Login/Register (when showAuthModal is true) */}
-      {showAuthModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg shadow-lg p-6 max-w-md w-full relative">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-300"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            {/* Include your AuthComponent */}
-            <AuthComponent />
+    {/* Core trackers flip cards */}
+    <motion.section variants={fadeInUp} className="bg-gray-800/40 py-12 px-4">
+      <div className="max-w-6xl mx-auto text-center mb-8">
+        <h2 className="text-3xl font-bold">Core Trackers</h2>
+        <p className="text-gray-400">Nine modules, one brain‑saving workspace.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+        {modules.map((mod, idx) => (
+          <div key={idx} className="flip-card h-64">
+            <div className="flip-card-inner">
+              <div className="flip-card-front p-6 bg-gray-700/50 rounded-lg flex flex-col items-center justify-center text-center">
+                {mod.icon}
+                <h3 className="text-xl font-semibold mt-4">{mod.title}</h3>
+              </div>
+              <div className="flip-card-back p-6 bg-gray-800 rounded-lg flex flex-col items-center justify-center text-center">
+                <p className="text-gray-300 mb-4">{mod.description}</p>
+                <img src={mod.gif} alt={`${mod.title} GIF`} className="max-h-32 rounded-lg shadow-lg" loading="lazy" />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        ))}
+      </div>
+    </motion.section>
+
+    {/* Testimonials */}
+    <motion.section variants={fadeInUp} className="py-16 px-4">
+      <div className="max-w-4xl mx-auto text-center mb-8">
+        <h2 className="text-3xl font-bold">Real users. Real results.</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {testimonials.map((t, i) => (
+          <motion.blockquote key={i} variants={fadeInUp} className="bg-gray-800/50 p-6 rounded-lg">
+            <p className="italic text-gray-200">“{t.quote}”</p>
+            <footer className="mt-4 text-sm text-gray-400">— {t.author}</footer>
+          </motion.blockquote>
+        ))}
+      </div>
+    </motion.section>
+
+    {/* Final CTA */}
+    <motion.section variants={fadeInUp} className="text-center py-12 px-4">
+      <h2 className="text-2xl font-bold mb-4">Start your focus journey today</h2>
+      <Link to="/signup" className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600">
+        Create Your Free Account
+      </Link>
+    </motion.section>
+
+    <motion.footer variants={fadeInUp} className="p-6 text-center bg-gray-900 text-gray-400">
+      <p>© 2025 MyTracker — Designed by neurodiverse devs for neurodiverse minds.</p>
+    </motion.footer>
+  </motion.div>
+);
 
 export default LandingPage;

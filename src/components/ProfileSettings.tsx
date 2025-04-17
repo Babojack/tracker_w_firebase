@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { auth } from '../firebaseConfig';
-import { updateProfile, updateEmail, updatePassword, signOut } from 'firebase/auth';
+import {
+  updateProfile,
+  updateEmail,
+  updatePassword,
+  signOut,
+} from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 const storage = getStorage();
 
 const ProfileSettings: React.FC = () => {
   const user = auth.currentUser;
-  // Проверяем, что пользователь авторизован – иначе работать не имеет смысла
-  if (!user) return <p>Пользователь не авторизован</p>;
+  if (!user) return <p className="text-white">Пользователь не авторизован</p>;
 
   const [displayName, setDisplayName] = useState(user.displayName || '');
   const [email, setEmail] = useState(user.email || '');
@@ -20,9 +25,7 @@ const ProfileSettings: React.FC = () => {
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setPhotoFile(file);
-    }
+    if (file) setPhotoFile(file);
   };
 
   const handleSave = async () => {
@@ -31,52 +34,41 @@ const ProfileSettings: React.FC = () => {
     setSuccess(null);
 
     try {
-      let updatedPhotoURL = photoURL;
+      let newPhotoURL = photoURL;
+
       if (photoFile) {
-        // Загружаем новое фото в Storage
         const storageRef = ref(storage, `profile_photos/${user.uid}/${photoFile.name}`);
         await uploadBytes(storageRef, photoFile);
-        updatedPhotoURL = await getDownloadURL(storageRef);
+        newPhotoURL = await getDownloadURL(storageRef);
       }
 
-      // Обновляем профиль (имя и фото)
-      await updateProfile(user, {
-        displayName,
-        photoURL: updatedPhotoURL,
-      });
+      await updateProfile(user, { displayName, photoURL: newPhotoURL });
 
-      // Если изменился email – обновляем его
-      if (email !== user.email) {
-        await updateEmail(user, email);
-      }
+      if (email !== user.email) await updateEmail(user, email);
+      if (password) await updatePassword(user, password);
 
-      // Если введён новый пароль – обновляем его
-      if (password) {
-        await updatePassword(user, password);
-      }
-
-      setPhotoURL(updatedPhotoURL);
+      setPhotoURL(newPhotoURL);
       setSuccess('Профиль успешно обновлён!');
     } catch (err: any) {
       setError(err.message);
     }
-    setLoading(false);
-  };
 
-  const handleSignOut = async () => {
-    await signOut(auth);
+    setLoading(false);
   };
 
   return (
     <div className="max-w-md mx-auto p-4 bg-gray-800 text-white rounded-lg">
       <h2 className="text-xl font-bold mb-4">Настройки профиля</h2>
+
       {error && <p className="text-red-400 mb-2">{error}</p>}
       {success && <p className="text-green-400 mb-2">{success}</p>}
+
       <div className="mb-4">
         <label className="block mb-1">Фото профиля</label>
-        {photoURL && <img src={photoURL} alt="Profile" className="w-24 h-24 rounded-full mb-2" />}
+        {photoURL && <img src={photoURL} alt="profile" className="w-24 h-24 rounded-full mb-2" />}
         <input type="file" accept="image/*" onChange={handlePhotoChange} />
       </div>
+
       <div className="mb-4">
         <label className="block mb-1">Имя</label>
         <input
@@ -86,6 +78,7 @@ const ProfileSettings: React.FC = () => {
           className="w-full p-2 rounded bg-gray-700"
         />
       </div>
+
       <div className="mb-4">
         <label className="block mb-1">Email</label>
         <input
@@ -95,6 +88,7 @@ const ProfileSettings: React.FC = () => {
           className="w-full p-2 rounded bg-gray-700"
         />
       </div>
+
       <div className="mb-4">
         <label className="block mb-1">Новый пароль</label>
         <input
@@ -105,16 +99,18 @@ const ProfileSettings: React.FC = () => {
           className="w-full p-2 rounded bg-gray-700"
         />
       </div>
+
       <div className="flex justify-between">
         <button
           onClick={handleSave}
           disabled={loading}
           className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded"
         >
-          {loading ? 'Сохранение...' : 'Сохранить изменения'}
+          {loading ? 'Сохранение…' : 'Сохранить'}
         </button>
+
         <button
-          onClick={handleSignOut}
+          onClick={() => signOut(auth)}
           className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded"
         >
           Выйти
