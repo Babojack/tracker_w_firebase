@@ -11,7 +11,19 @@ import {
   ArchiveRestore
 } from 'lucide-react';
 import { db, auth } from '../../firebaseConfig';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  updateDoc,
+  query,
+  where,
+  orderBy
+} from 'firebase/firestore';
+
+// ───────────────────────────────────────── Types ──────────────────────────────────────────
 
 type PriorityLevel = 'high' | 'medium' | 'low' | 'none';
 
@@ -28,12 +40,14 @@ interface Todo {
   notes: TodoNote[];
   priority: PriorityLevel;
   archived: boolean;
+  createdAt: number; // ← добавлено
 }
 
 interface TodoGroup {
   id: string;
   title: string;
   todos: Todo[];
+  createdAt: number; // ← добавлено
   userId?: string;
 }
 
@@ -43,6 +57,55 @@ interface FilterOptions {
   searchText: string;
   viewArchived: boolean;
 }
+
+// ──────────────────────────────────────── Helpers ─────────────────────────────────────────
+
+const sortByDateDesc = (a: { createdAt: number }, b: { createdAt: number }) =>
+  b.createdAt - a.createdAt;
+
+const getPriorityRank = (priority: PriorityLevel): number => {
+  switch (priority) {
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+};
+
+const getPriorityDisplay = (priority: PriorityLevel) => {
+  switch (priority) {
+    case 'high':
+      return {
+        icon: <ArrowUp className="w-4 h-4 text-red-500" />,
+        color: 'bg-red-500/20',
+        borderColor: 'border-red-500'
+      };
+    case 'medium':
+      return {
+        icon: <Circle className="w-4 h-4 text-yellow-500" />,
+        color: 'bg-yellow-500/20',
+        borderColor: 'border-yellow-500'
+      };
+    case 'low':
+      return {
+        icon: <ArrowDown className="w-4 h-4 text-green-500" />,
+        color: 'bg-green-500/20',
+        borderColor: 'border-green-500'
+      };
+    default:
+      return {
+        icon: null,
+        color: '',
+        borderColor: 'border-transparent'
+      };
+  }
+};
+
+// ───────────────────────────────────────── Component ───────────────────────────────────────
 
 const TodoTracker: React.FC = () => {
   const [todoGroups, setTodoGroups] = useState<TodoGroup[]>([]);
@@ -56,32 +119,43 @@ const TodoTracker: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Beim Mounten: Todo-Gruppen des aktuell angemeldeten Users aus Firestore laden
+  // ─────────────────────────────────── Fetch groups on mount ───────────────────────────────────
   useEffect(() => {
     const fetchGroups = async () => {
       try {
         const q = query(
-          collection(db, "todoGroups"),
-          where("userId", "==", auth.currentUser?.uid || "")
+          collection(db, 'todoGroups'),
+          where('userId', '==', auth.currentUser?.uid || ''),
+          orderBy('createdAt', 'desc') // серверная сортировка
         );
         const querySnapshot = await getDocs(q);
         const groups: TodoGroup[] = [];
         querySnapshot.forEach((document) => {
-          groups.push({ id: document.id, ...document.data() } as TodoGroup);
+          const data = document.data() as Omit<TodoGroup, 'id'>;
+          const todosWithDates = (data.todos || []).map((t: any) => ({
+            ...t,
+            createdAt: t.createdAt ?? t.id // fallback для старых задач
+          })) as Todo[];
+          groups.push({
+            id: document.id,
+            ...data,
+            createdAt: data.createdAt ?? Date.now(), // fallback
+            todos: todosWithDates.sort(sortByDateDesc)
+          });
         });
-        setTodoGroups(groups);
+        setTodoGroups(groups.sort(sortByDateDesc));
       } catch (error) {
-        console.error("Error loading groups:", error);
+        console.error('Error loading groups:', error);
       }
     };
     fetchGroups();
   }, []);
 
-  // Sicherstellen, dass für jede Gruppe ein Eintrag in selectedPriorities vorhanden ist
+  // ───────────────────────────── Ensure selectedPriorities initialized ─────────────────────────────
   useEffect(() => {
     const updatedPriorities = { ...selectedPriorities };
     let hasChanges = false;
-    todoGroups.forEach(group => {
+    todoGroups.forEach((group) => {
       if (!(group.id in updatedPriorities)) {
         updatedPriorities[group.id] = 'none';
         hasChanges = true;
@@ -92,80 +166,84 @@ const TodoTracker: React.FC = () => {
     }
   }, [todoGroups, selectedPriorities]);
 
-  // Hilfsfunktion zum Aktualisieren der Todos einer Gruppe in Firestore
+  // ───────────────────────────── Firestore helper ─────────────────────────────
   const updateGroupTodos = async (groupId: string, todos: Todo[]) => {
     try {
-      await updateDoc(doc(db, "todoGroups", groupId), { todos });
+      await updateDoc(doc(db, 'todoGroups', groupId), { todos });
     } catch (error) {
-      console.error("Error updating group todos:", error);
+      console.error('Error updating group todos:', error);
     }
   };
 
+  // ───────────────────────────────────── Group CRUD ─────────────────────────────────────
   const addNewGroup = async () => {
+    const now = Date.now();
     const newGroup: Omit<TodoGroup, 'id'> = {
-      title: new Date().toLocaleDateString('en-US', {
+      title: new Date(now).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
       todos: [],
+      createdAt: now,
       userId: auth.currentUser?.uid || ''
     };
     try {
-      const docRef = await addDoc(collection(db, "todoGroups"), newGroup);
+      const docRef = await addDoc(collection(db, 'todoGroups'), newGroup);
       const groupWithId: TodoGroup = { id: docRef.id, ...newGroup };
-      setTodoGroups([groupWithId, ...todoGroups]);
-      setSelectedPriorities(prev => ({ ...prev, [docRef.id]: 'none' }));
+      setTodoGroups((prev) => [groupWithId, ...prev].sort(sortByDateDesc));
+      setSelectedPriorities((prev) => ({ ...prev, [docRef.id]: 'none' }));
     } catch (error) {
-      console.error("Error adding new group:", error);
+      console.error('Error adding new group:', error);
     }
   };
 
   const deleteGroup = async (groupId: string) => {
     if (window.confirm('Are you sure you want to delete this group?')) {
       try {
-        await deleteDoc(doc(db, "todoGroups", groupId));
-        setTodoGroups(prev => prev.filter(group => group.id !== groupId));
-        setSelectedPriorities(prev => {
+        await deleteDoc(doc(db, 'todoGroups', groupId));
+        setTodoGroups((prev) => prev.filter((group) => group.id !== groupId));
+        setSelectedPriorities((prev) => {
           const newState = { ...prev };
           delete newState[groupId];
           return newState;
         });
-        setNewTaskInputs(prev => {
+        setNewTaskInputs((prev) => {
           const newState = { ...prev };
           delete newState[groupId];
           return newState;
         });
       } catch (error) {
-        console.error("Error deleting group:", error);
+        console.error('Error deleting group:', error);
       }
     }
   };
 
+  // ───────────────────────────────────── Todo CRUD ─────────────────────────────────────
   const addTodo = async (groupId: string) => {
     const text = newTaskInputs[groupId] || '';
     if (text.trim()) {
+      const now = Date.now();
       const newTodo: Todo = {
-        id: Date.now(),
+        id: now,
         text: text.trim(),
         completed: false,
         notes: [],
         priority: selectedPriorities[groupId] || 'none',
-        archived: false
+        archived: false,
+        createdAt: now
       };
-      const updatedGroups = todoGroups.map(group => {
+      const updatedGroups = todoGroups.map((group) => {
         if (group.id === groupId) {
-          const updatedTodos = [newTodo, ...group.todos].sort(
-            (a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority)
-          );
+          const updatedTodos = [newTodo, ...group.todos].sort(sortByDateDesc);
           return { ...group, todos: updatedTodos };
         }
         return group;
       });
       setTodoGroups(updatedGroups);
-      setNewTaskInputs(prev => ({ ...prev, [groupId]: '' }));
-      const group = updatedGroups.find(g => g.id === groupId);
+      setNewTaskInputs((prev) => ({ ...prev, [groupId]: '' }));
+      const group = updatedGroups.find((g) => g.id === groupId);
       if (group) {
         await updateGroupTodos(groupId, group.todos);
       }
@@ -173,17 +251,17 @@ const TodoTracker: React.FC = () => {
   };
 
   const toggleTodo = async (groupId: string, todoId: number) => {
-    const updatedGroups = todoGroups.map(group => {
+    const updatedGroups = todoGroups.map((group) => {
       if (group.id === groupId) {
-        const updatedTodos = group.todos
-          .map(todo => todo.id === todoId ? { ...todo, completed: !todo.completed } : todo)
-          .sort((a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority));
-        return { ...group, todos: updatedTodos };
+        const updatedTodos = group.todos.map((todo) =>
+          todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
+        );
+        return { ...group, todos: updatedTodos.sort(sortByDateDesc) };
       }
       return group;
     });
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
@@ -191,9 +269,9 @@ const TodoTracker: React.FC = () => {
 
   const addNote = async (groupId: string, todoId: number, noteText: string) => {
     if (noteText.trim()) {
-      const updatedGroups = todoGroups.map(group => {
+      const updatedGroups = todoGroups.map((group) => {
         if (group.id === groupId) {
-          const updatedTodos = group.todos.map(todo => {
+          const updatedTodos = group.todos.map((todo) => {
             if (todo.id === todoId) {
               const newNote: TodoNote = {
                 id: Date.now(),
@@ -209,7 +287,7 @@ const TodoTracker: React.FC = () => {
         return group;
       });
       setTodoGroups(updatedGroups);
-      const group = updatedGroups.find(g => g.id === groupId);
+      const group = updatedGroups.find((g) => g.id === groupId);
       if (group) {
         await updateGroupTodos(groupId, group.todos);
       }
@@ -217,125 +295,88 @@ const TodoTracker: React.FC = () => {
   };
 
   const deleteTodo = async (groupId: string, todoId: number) => {
-    const updatedGroups = todoGroups.map(group =>
-      group.id === groupId ? { ...group, todos: group.todos.filter(todo => todo.id !== todoId) } : group
+    const updatedGroups = todoGroups.map((group) =>
+      group.id === groupId ? { ...group, todos: group.todos.filter((todo) => todo.id !== todoId) } : group
     );
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
   };
 
   const archiveTodo = async (groupId: string, todoId: number) => {
-    const updatedGroups = todoGroups.map(group => {
+    const updatedGroups = todoGroups.map((group) => {
       if (group.id === groupId) {
-        const updatedTodos = group.todos
-          .map(todo => todo.id === todoId ? { ...todo, archived: true } : todo)
-          .sort((a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority));
-        return { ...group, todos: updatedTodos };
+        const updatedTodos = group.todos.map((todo) =>
+          todo.id === todoId ? { ...todo, archived: true } : todo
+        );
+        return { ...group, todos: updatedTodos.sort(sortByDateDesc) };
       }
       return group;
     });
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
   };
 
   const unarchiveTodo = async (groupId: string, todoId: number) => {
-    const updatedGroups = todoGroups.map(group => {
+    const updatedGroups = todoGroups.map((group) => {
       if (group.id === groupId) {
-        const updatedTodos = group.todos
-          .map(todo => todo.id === todoId ? { ...todo, archived: false } : todo)
-          .sort((a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority));
-        return { ...group, todos: updatedTodos };
+        const updatedTodos = group.todos.map((todo) =>
+          todo.id === todoId ? { ...todo, archived: false } : todo
+        );
+        return { ...group, todos: updatedTodos.sort(sortByDateDesc) };
       }
       return group;
     });
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
   };
 
   const deleteNote = async (groupId: string, todoId: number, noteId: number) => {
-    const updatedGroups = todoGroups.map(group => {
+    const updatedGroups = todoGroups.map((group) => {
       if (group.id === groupId) {
-        const updatedTodos = group.todos.map(todo =>
-          todo.id === todoId ? { ...todo, notes: todo.notes.filter(note => note.id !== noteId) } : todo
+        const updatedTodos = group.todos.map((todo) =>
+          todo.id === todoId ? { ...todo, notes: todo.notes.filter((note) => note.id !== noteId) } : todo
         );
         return { ...group, todos: updatedTodos };
       }
       return group;
     });
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
   };
 
   const setPriority = async (groupId: string, todoId: number, priority: PriorityLevel) => {
-    const updatedGroups = todoGroups.map(group => {
+    const updatedGroups = todoGroups.map((group) => {
       if (group.id === groupId) {
-        const updatedTodos = group.todos
-          .map(todo => todo.id === todoId ? { ...todo, priority } : todo)
-          .sort((a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority));
-        return { ...group, todos: updatedTodos };
+        const updatedTodos = group.todos.map((todo) =>
+          todo.id === todoId ? { ...todo, priority } : todo
+        );
+        return { ...group, todos: updatedTodos.sort(sortByDateDesc) };
       }
       return group;
     });
     setTodoGroups(updatedGroups);
-    const group = updatedGroups.find(g => g.id === groupId);
+    const group = updatedGroups.find((g) => g.id === groupId);
     if (group) {
       await updateGroupTodos(groupId, group.todos);
     }
   };
 
-  const getPriorityRank = (priority: PriorityLevel): number => {
-    switch (priority) {
-      case 'high': return 3;
-      case 'medium': return 2;
-      case 'low': return 1;
-      default: return 0;
-    }
-  };
-
-  const getPriorityDisplay = (priority: PriorityLevel) => {
-    switch (priority) {
-      case 'high':
-        return {
-          icon: <ArrowUp className="w-4 h-4 text-red-500" />,
-          color: 'bg-red-500/20',
-          borderColor: 'border-red-500'
-        };
-      case 'medium':
-        return {
-          icon: <Circle className="w-4 h-4 text-yellow-500" />,
-          color: 'bg-yellow-500/20',
-          borderColor: 'border-yellow-500'
-        };
-      case 'low':
-        return {
-          icon: <ArrowDown className="w-4 h-4 text-green-500" />,
-          color: 'bg-green-500/20',
-          borderColor: 'border-green-500'
-        };
-      default:
-        return {
-          icon: null,
-          color: '',
-          borderColor: 'border-transparent'
-        };
-    }
-  };
-
+  // ───────────────────────────────────── Filtering ─────────────────────────────────────
   const getFilteredTodos = (todos: Todo[], archived: boolean) => {
     return todos
-      .filter(todo => {
+      .filter((todo) => {
         if (todo.archived !== archived) return false;
         if (!filterOptions.showCompleted && todo.completed) return false;
         if (
@@ -347,23 +388,24 @@ const TodoTracker: React.FC = () => {
         if (
           filterOptions.searchText &&
           !todo.text.toLowerCase().includes(filterOptions.searchText.toLowerCase()) &&
-          !todo.notes.some(note => note.text.toLowerCase().includes(filterOptions.searchText.toLowerCase()))
+          !todo.notes.some((note) => note.text.toLowerCase().includes(filterOptions.searchText.toLowerCase()))
         ) {
           return false;
         }
         return true;
       })
-      .sort((a, b) => getPriorityRank(b.priority) - getPriorityRank(a.priority));
+      .sort(sortByDateDesc);
   };
 
   const archivedTasksCount = todoGroups.reduce(
-    (count, group) => count + group.todos.filter(todo => todo.archived).length,
+    (count, group) => count + group.todos.filter((todo) => todo.archived).length,
     0
   );
 
+  // ───────────────────────────────────── UI ─────────────────────────────────────
   return (
     <div className="w-full max-w-full sm:max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">
-      {/* Angepasster Header mit flex-wrap für mobile Geräte */}
+      {/* Header */}
       <div className="flex flex-wrap justify-between items-center mb-4 sm:mb-6">
         <h2 className="text-lg sm:text-2xl font-bold w-full sm:w-auto mb-2 sm:mb-0">ToDo's</h2>
         <div className="flex gap-2 flex-wrap">
@@ -389,6 +431,7 @@ const TodoTracker: React.FC = () => {
         </div>
       </div>
 
+      {/* Archived banner */}
       {!filterOptions.viewArchived && archivedTasksCount > 0 && (
         <div className="bg-gray-700 rounded-lg p-3 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -406,10 +449,12 @@ const TodoTracker: React.FC = () => {
         </div>
       )}
 
+      {/* Filters */}
       {showFilters && (
         <div className="bg-gray-800 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
           <h3 className="text-base sm:text-lg font-semibold mb-3">Filter Options</h3>
           <div className="space-y-3">
+            {/* Search */}
             <div>
               <label className="block text-sm mb-1">Search</label>
               <input
@@ -420,6 +465,7 @@ const TodoTracker: React.FC = () => {
                 className="w-full bg-gray-700 p-2 rounded text-sm"
               />
             </div>
+            {/* Show Tasks */}
             <div>
               <label className="block text-sm mb-1">Show Tasks</label>
               <div className="flex gap-2">
@@ -441,6 +487,7 @@ const TodoTracker: React.FC = () => {
                 </button>
               </div>
             </div>
+            {/* Priority */}
             <div>
               <label className="block text-sm mb-1">Priority</label>
               <div className="flex flex-wrap gap-2">
@@ -486,6 +533,7 @@ const TodoTracker: React.FC = () => {
                 </button>
               </div>
             </div>
+            {/* Archive view */}
             <div>
               <label className="block text-sm mb-1">Archive View</label>
               <div className="flex gap-2">
@@ -507,6 +555,7 @@ const TodoTracker: React.FC = () => {
                 </button>
               </div>
             </div>
+            {/* Reset */}
             <div className="flex justify-end">
               <button
                 onClick={() =>
@@ -526,6 +575,7 @@ const TodoTracker: React.FC = () => {
         </div>
       )}
 
+      {/* Banner when viewing archive */}
       {filterOptions.viewArchived && (
         <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -541,18 +591,20 @@ const TodoTracker: React.FC = () => {
         </div>
       )}
 
-      {filterOptions.viewArchived && todoGroups.every(group => group.todos.filter(todo => todo.archived).length === 0) && (
-        <div className="bg-gray-800 rounded-lg p-8 text-center mb-4">
-          <Archive className="w-10 h-10 text-gray-500 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-300 mb-1">No archived tasks</h3>
-          <p className="text-gray-500">You don't have any archived tasks yet.</p>
-        </div>
-      )}
+      {filterOptions.viewArchived &&
+        todoGroups.every((group) => group.todos.filter((todo) => todo.archived).length === 0) && (
+          <div className="bg-gray-800 rounded-lg p-8 text-center mb-4">
+            <Archive className="w-10 h-10 text-gray-500 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-300 mb-1">No archived tasks</h3>
+            <p className="text-gray-500">You don't have any archived tasks yet.</p>
+          </div>
+        )}
 
-      {/* Grid-Layout: eine Spalte auf mobilen Geräten, zwei (oder mehr) Spalten auf größeren Screens */}
+      {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-        {todoGroups.map(group => (
+        {todoGroups.map((group) => (
           <div key={group.id} className="bg-gray-800 rounded-lg p-3 sm:p-4 relative">
+            {/* Group header */}
             <div className="flex justify-between items-center mb-3 sm:mb-4">
               <h3 className="text-lg sm:text-xl font-semibold break-words">{group.title}</h3>
               {todoGroups.length > 1 && (
@@ -566,15 +618,13 @@ const TodoTracker: React.FC = () => {
               )}
             </div>
 
-            {/* Neues Task-Feld nur im aktiven Modus */}
+            {/* New task input */}
             {!filterOptions.viewArchived && (
               <div className="space-y-2 sm:space-y-3 mb-4">
                 <div className="space-y-2">
                   <div className="flex gap-2 flex-wrap">
                     <button
-                      onClick={() =>
-                        setSelectedPriorities({ ...selectedPriorities, [group.id]: 'high' })
-                      }
+                      onClick={() => setSelectedPriorities({ ...selectedPriorities, [group.id]: 'high' })}
                       className={`p-1.5 rounded-full ${
                         selectedPriorities[group.id] === 'high'
                           ? 'bg-red-500/50 ring-2 ring-red-500'
@@ -585,9 +635,7 @@ const TodoTracker: React.FC = () => {
                       <ArrowUp className="w-5 h-5 text-red-500" />
                     </button>
                     <button
-                      onClick={() =>
-                        setSelectedPriorities({ ...selectedPriorities, [group.id]: 'medium' })
-                      }
+                      onClick={() => setSelectedPriorities({ ...selectedPriorities, [group.id]: 'medium' })}
                       className={`p-1.5 rounded-full ${
                         selectedPriorities[group.id] === 'medium'
                           ? 'bg-yellow-500/50 ring-2 ring-yellow-500'
@@ -598,9 +646,7 @@ const TodoTracker: React.FC = () => {
                       <Circle className="w-5 h-5 text-yellow-500" />
                     </button>
                     <button
-                      onClick={() =>
-                        setSelectedPriorities({ ...selectedPriorities, [group.id]: 'low' })
-                      }
+                      onClick={() => setSelectedPriorities({ ...selectedPriorities, [group.id]: 'low' })}
                       className={`p-1.5 rounded-full ${
                         selectedPriorities[group.id] === 'low'
                           ? 'bg-green-500/50 ring-2 ring-green-500'
@@ -611,9 +657,7 @@ const TodoTracker: React.FC = () => {
                       <ArrowDown className="w-5 h-5 text-green-500" />
                     </button>
                     <button
-                      onClick={() =>
-                        setSelectedPriorities({ ...selectedPriorities, [group.id]: 'none' })
-                      }
+                      onClick={() => setSelectedPriorities({ ...selectedPriorities, [group.id]: 'none' })}
                       className={`p-1.5 rounded-full ${
                         selectedPriorities[group.id] === 'none'
                           ? 'bg-blue-500/50 ring-2 ring-blue-500'
@@ -629,9 +673,7 @@ const TodoTracker: React.FC = () => {
                       type="text"
                       placeholder="Add new task..."
                       value={newTaskInputs[group.id] || ''}
-                      onChange={(e) =>
-                        setNewTaskInputs({ ...newTaskInputs, [group.id]: e.target.value })
-                      }
+                      onChange={(e) => setNewTaskInputs({ ...newTaskInputs, [group.id]: e.target.value })}
                       className={`flex-1 bg-gray-700 p-2 rounded text-sm sm:text-base placeholder:text-gray-400 border-2 ${
                         getPriorityDisplay(selectedPriorities[group.id] || 'none').borderColor
                       }`}
@@ -652,9 +694,9 @@ const TodoTracker: React.FC = () => {
               </div>
             )}
 
-            {/* Todo-Liste */}
+            {/* Todo list */}
             <div className="space-y-2 sm:space-y-3">
-              {getFilteredTodos(group.todos, filterOptions.viewArchived).map(todo => {
+              {getFilteredTodos(group.todos, filterOptions.viewArchived).map((todo) => {
                 const priorityDisplay = getPriorityDisplay(todo.priority);
                 return (
                   <div
@@ -667,13 +709,13 @@ const TodoTracker: React.FC = () => {
                           type="checkbox"
                           checked={todo.completed}
                           onChange={() => toggleTodo(group.id, todo.id)}
-                          className="w-4 h-4 rounded shrink-0"
-                        />
+                          className="w-4 h-4 rounded shrink-0" />
                         <span className={`${todo.completed ? 'line-through text-gray-400' : ''} break-words text-sm sm:text-base`}>
                           {todo.text}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Priority buttons */}
                         <div className="flex border border-gray-600 rounded overflow-hidden">
                           <button
                             onClick={() => setPriority(group.id, todo.id, 'high')}
@@ -732,6 +774,7 @@ const TodoTracker: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Note input */}
                     <input
                       type="text"
                       placeholder="Add a note and press Enter..."
@@ -743,8 +786,9 @@ const TodoTracker: React.FC = () => {
                         }
                       }}
                     />
+                    {/* Notes */}
                     <div className="space-y-2 ml-4 sm:ml-6">
-                      {todo.notes.map(note => (
+                      {todo.notes.map((note) => (
                         <div key={note.id} className="text-sm text-gray-400 flex justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="break-words">{note.text}</div>
@@ -766,7 +810,7 @@ const TodoTracker: React.FC = () => {
               })}
               {getFilteredTodos(group.todos, filterOptions.viewArchived).length === 0 && (
                 <div className="text-center py-6 text-gray-500">
-                  {group.todos.filter(todo => todo.archived === filterOptions.viewArchived).length === 0
+                  {group.todos.filter((todo) => todo.archived === filterOptions.viewArchived).length === 0
                     ? filterOptions.viewArchived
                       ? 'No archived tasks in this group.'
                       : 'No active tasks yet. Add your first task above!'
