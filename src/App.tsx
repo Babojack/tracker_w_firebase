@@ -1,6 +1,24 @@
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Activity, BarChart2, Target, Brain, Plus, Calculator, Gift, Plane, ShoppingCart } from 'lucide-react';
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  Navigate,
+} from 'react-router-dom';
+import {
+  Activity,
+  BarChart2,
+  Target,
+  Brain,
+  Plus,
+  Calculator,
+  Gift,
+  Plane,
+  ShoppingCart,
+  BookOpen,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import Dashboard from './components/Dashboard';
@@ -15,6 +33,7 @@ import WishlistTracker from './components/trackers/WishlistTracker';
 import TravelPlanner from './components/trackers/TravelPlanner';
 import ShoppingListTracker from './components/trackers/ShoppingListTracker';
 import FloatingChatGPT from './components/trackers/FloatingChatGPT';
+import BookTracker from './components/trackers/BookTracker';
 
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -36,7 +55,8 @@ type TabId =
   | 'budget'
   | 'wishlist'
   | 'travel'
-  | 'shopping';
+  | 'shopping'
+  | 'books';
 
 interface Tab {
   id: TabId;
@@ -53,10 +73,14 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
-  useEffect(() => onAuthStateChanged(auth, (u) => {
-    setUser(u);
-    setLoading(false);
-  }), []);
+  useEffect(
+    () =>
+      onAuthStateChanged(auth, (u) => {
+        setUser(u);
+        setLoading(false);
+      }),
+    []
+  );
 
   useEffect(() => {
     const p = new URLSearchParams(location.search);
@@ -74,7 +98,7 @@ const App: React.FC = () => {
       const snap = await getDoc(ref);
       const p = new URLSearchParams(location.search);
       if (!p.get('tab')) {
-        if (snap.exists()) setActiveTab(snap.data().activeTab);
+        if (snap.exists()) setActiveTab((snap.data() as any).activeTab || 'dashboard');
         else await setDoc(ref, { activeTab: 'dashboard' });
       }
     })();
@@ -96,6 +120,7 @@ const App: React.FC = () => {
     { id: 'todos', name: "ToDo's", Icon: Plus },
     { id: 'budget', name: 'Household Budget', Icon: Calculator },
     { id: 'wishlist', name: 'Wishlist', Icon: Gift },
+    { id: 'books', name: 'Book Tracker', Icon: BookOpen },
     { id: 'shopping', name: 'Shopping List', Icon: ShoppingCart },
     { id: 'travel', name: 'Travel Planner', Icon: Plane },
   ];
@@ -119,7 +144,9 @@ const App: React.FC = () => {
               key={t.id}
               onClick={() => saveTab(t.id)}
               className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                activeTab === t.id ? 'bg-purple-600' : 'bg-gray-700/50 hover:bg-gray-700'
+                activeTab === t.id
+                  ? 'bg-purple-600'
+                  : 'bg-gray-700/50 hover:bg-gray-700'
               }`}
             >
               <t.Icon size={16} />
@@ -131,23 +158,11 @@ const App: React.FC = () => {
         <div className="bg-gray-800/50 rounded-lg p-6 min-h-[400px]">
           <AnimatePresence mode="wait">
             {showProfileSettings ? (
-              <motion.div
-                key="profile-settings"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
+              <motion.div key="profile-settings" variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <ProfileSettings />
               </motion.div>
             ) : (
-              <motion.div
-                key={activeTab}
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
+              <motion.div key={activeTab} variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 {activeTab === 'dashboard' && <Dashboard />}
                 {activeTab === 'projects' && <ProjectTracker />}
                 {activeTab === 'goals' && <GoalsTracker />}
@@ -156,6 +171,7 @@ const App: React.FC = () => {
                 {activeTab === 'todos' && <TodoTracker />}
                 {activeTab === 'budget' && <HouseholdBudgetCalculator />}
                 {activeTab === 'wishlist' && <WishlistTracker />}
+                {activeTab === 'books' && <BookTracker />}
                 {activeTab === 'shopping' && <ShoppingListTracker />}
                 {activeTab === 'travel' && <TravelPlanner />}
               </motion.div>
