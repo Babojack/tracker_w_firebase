@@ -21,13 +21,17 @@ interface NoteItem {
   result?: string;
 }
 
+// Three possible statuses for each book entry
+const statuses = ['Next Book', 'Reading', 'Read'] as const;
+type Status = typeof statuses[number];
+
 interface BookEntry {
   id: string;
   openLibraryId: string;
   title: string;
   authors: string[];
   coverUrl: string;
-  read: boolean;
+  status: Status;
   conclusions: NoteItem[];
   exercises: NoteItem[];
   remarks: NoteItem[];
@@ -41,7 +45,7 @@ interface OLDoc {
   cover_i?: number;
 }
 
-// Nur diese beiden Sektionen nutzen:
+// Use only these two note sections:
 const noteSections = ['conclusions', 'remarks'] as const;
 type NoteSection = typeof noteSections[number];
 
@@ -51,7 +55,7 @@ const BookTracker: React.FC = () => {
   const [entries, setEntries] = useState<BookEntry[]>([]);
   const timeoutRef = useRef<number>();
 
-  // Lädt gespeicherte Bücher
+  // Load saved books
   useEffect(() => {
     (async () => {
       const q = query(
@@ -65,7 +69,7 @@ const BookTracker: React.FC = () => {
     })();
   }, []);
 
-  // OpenLibrary-Suche
+  // OpenLibrary search
   useEffect(() => {
     if (queryText.trim().length < 3) {
       setSuggestions([]);
@@ -86,30 +90,41 @@ const BookTracker: React.FC = () => {
   }, [queryText]);
 
   const addBook = async (book: OLDoc) => {
-    const entry = {
+    const entry: Omit<BookEntry, 'id'> = {
       openLibraryId: book.key,
       title: book.title,
       authors: book.author_name || [],
       coverUrl: book.cover_i
         ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
         : '',
-      read: false,
-      conclusions: [] as NoteItem[],
-      exercises: [] as NoteItem[],
-      remarks: [] as NoteItem[],
+      status: 'Next Book',
+      conclusions: [],
+      exercises: [],
+      remarks: [],
       timestamp: new Date().toISOString(),
       userId: auth.currentUser?.uid,
-    };
+    } as any;
     const ref = await addDoc(collection(db, 'booksRead'), entry);
     setEntries(prev => [{ id: ref.id, ...entry }, ...prev]);
     setSuggestions([]);
     setQueryText('');
   };
 
-  const toggleRead = async (id: string) => {
-    setEntries(prev => prev.map(e => (e.id === id ? { ...e, read: !e.read } : e)));
+  // Cycle through statuses: Next Book -> Reading -> Read -> Next Book
+  const cycleStatus = async (id: string) => {
+    setEntries(prev =>
+      prev.map(e => {
+        if (e.id !== id) return e;
+        const currentIndex = statuses.indexOf(e.status);
+        const nextIndex = (currentIndex + 1) % statuses.length;
+        return { ...e, status: statuses[nextIndex] };
+      })
+    );
     const book = entries.find(e => e.id === id);
-    if (book) await updateDoc(doc(db, 'booksRead', id), { read: !book.read });
+    if (book) {
+      const nextIndex = (statuses.indexOf(book.status) + 1) % statuses.length;
+      await updateDoc(doc(db, 'booksRead', id), { status: statuses[nextIndex] });
+    }
   };
 
   const pushNote = async (
@@ -134,10 +149,15 @@ const BookTracker: React.FC = () => {
     noteId: string,
     key: 'conclusions' | 'exercises' | 'remarks'
   ) => {
-    if (!window.confirm('Действительно удалить эту запись?')) return;
-    setEntries(prev => prev.map(e => (e.id === bookId ? { ...e, [key]: e[key].filter(n => n.id !== noteId) } : e)));
+    if (!window.confirm('Are you sure you want to delete this note?')) return;
+    setEntries(prev =>
+      prev.map(e => (e.id === bookId ? { ...e, [key]: e[key].filter(n => n.id !== noteId) } : e))
+    );
     const book = entries.find(e => e.id === bookId);
-    if (book) await updateDoc(doc(db, 'booksRead', bookId), { [key]: book[key].filter(n => n.id !== noteId) });
+    if (book)
+      await updateDoc(doc(db, 'booksRead', bookId), {
+        [key]: book[key].filter(n => n.id !== noteId),
+      });
   };
 
   const updateExerciseProperty = async (
@@ -159,7 +179,7 @@ const BookTracker: React.FC = () => {
   };
 
   const dropBook = async (id: string) => {
-    if (!window.confirm('Вы уверены, что хотите удалить книгу?')) return;
+    if (!window.confirm('Are you sure you want to delete this book?')) return;
     await deleteDoc(doc(db, 'booksRead', id));
     setEntries(prev => prev.filter(e => e.id !== id));
   };
@@ -215,16 +235,20 @@ const BookTracker: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => toggleRead(e.id)}
-                  className={`px-3 py-1 rounded ${e.read ? 'bg-green-600' : 'bg-blue-600'}`}
+                  onClick={() => cycleStatus(e.id)}
+                  className={`px-3 py-1 rounded ${
+                    e.status === 'Next Book' ? 'bg-blue-600' :
+                    e.status === 'Reading' ? 'bg-yellow-600' :
+                    'bg-green-600'
+                  }`}
                 >
-                  {e.read ? 'Read' : 'Mark Read'}
+                  {e.status}
                 </button>
                 <button onClick={() => dropBook(e.id)}><X /></button>
               </div>
             </div>
 
-            {/* Conclusions & Remarks Sektionen */}
+            {/* Conclusions & Remarks Sections */}
             {noteSections.map(section => (
               <details key={section} className="bg-gray-900 rounded p-2">
                 <summary className="font-semibold cursor-pointer capitalize">{section}</summary>
@@ -248,7 +272,7 @@ const BookTracker: React.FC = () => {
               </details>
             ))}
 
-            {/* Exercises mit Labels */}
+            {/* Exercises with English labels */}
             <details className="bg-gray-900 rounded p-2">
               <summary className="font-semibold cursor-pointer">Exercises</summary>
               <div className="mt-2 space-y-2">
@@ -276,12 +300,12 @@ const BookTracker: React.FC = () => {
                             checked={n.useful}
                             onChange={() => updateExerciseProperty(e.id, n.id, 'useful', !n.useful)}
                           />
-                          <span className="ml-2 text-xs">Полезно?</span>
+                          <span className="ml-2 text-xs">Useful?</span>
                         </label>
                         <input
                           type="text"
                           value={n.result}
-                          placeholder="Что мне это дало..."
+                          placeholder="What did I gain from this..."
                           className="flex-1 bg-gray-800 rounded p-1 text-xs"
                           onChange={ev => updateExerciseProperty(e.id, n.id, 'result', ev.target.value)}
                         />
