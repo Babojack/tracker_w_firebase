@@ -1,24 +1,6 @@
-// src/App.tsx
 import React, { useState, useEffect } from 'react';
-import {
-  Routes,
-  Route,
-  useNavigate,
-  useLocation,
-  Navigate,
-} from 'react-router-dom';
-import {
-  Activity,
-  BarChart2,
-  Target,
-  Brain,
-  Plus,
-  Calculator,
-  Gift,
-  Plane,
-  ShoppingCart,
-  BookOpen,
-} from 'lucide-react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Activity, BarChart2, Target, Brain, Plus, Calculator, Gift, Plane, ShoppingCart, BookOpen, User } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import Dashboard from './components/Dashboard';
@@ -144,25 +126,42 @@ const App: React.FC = () => {
               key={t.id}
               onClick={() => saveTab(t.id)}
               className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                activeTab === t.id
-                  ? 'bg-purple-600'
-                  : 'bg-gray-700/50 hover:bg-gray-700'
+                activeTab === t.id ? 'bg-purple-600' : 'bg-gray-700/50 hover:bg-gray-700'
               }`}
             >
               <t.Icon size={16} />
               {t.name}
             </button>
           ))}
+          <button
+            onClick={() => setShowProfileSettings((v) => !v)}
+            className="ml-auto flex items-center gap-1 px-3 py-1 rounded bg-gray-700/50 hover:bg-gray-700 transition-colors"
+          >
+            <User size={16} />
+            Profile
+          </button>
         </nav>
 
         <div className="bg-gray-800/50 rounded-lg p-6 min-h-[400px]">
           <AnimatePresence mode="wait">
             {showProfileSettings ? (
-              <motion.div key="profile-settings" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <motion.div
+                key="profile-settings"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
                 <ProfileSettings />
               </motion.div>
             ) : (
-              <motion.div key={activeTab} variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <motion.div
+                key={activeTab}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
                 {activeTab === 'dashboard' && <Dashboard />}
                 {activeTab === 'projects' && <ProjectTracker />}
                 {activeTab === 'goals' && <GoalsTracker />}
