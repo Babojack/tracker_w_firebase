@@ -1,4 +1,11 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+// src/components/WishlistTracker.tsx
+
+import React, {
+  useState,
+  useEffect,
+  ChangeEvent,
+  FormEvent,
+} from 'react';
 import {
   Trash2,
   Edit,
@@ -25,7 +32,7 @@ import {
 } from 'firebase/firestore';
 
 interface WishlistItem {
-  id: string; // Firestore document ID
+  id: string;
   name: string;
   description: string;
   priority: 'low' | 'medium' | 'high';
@@ -36,16 +43,15 @@ interface WishlistItem {
   createdAt: number;
   image: string;
   userId: string;
-  archived?: boolean; // For archive status
+  archived?: boolean;
 }
 
 interface Category {
-  id: string; // Category ID
+  id: string;
   name: string;
   userId: string;
 }
 
-// Predefined 15 categories in English (userId left empty as they're static)
 const PREDEFINED_CATEGORIES: Category[] = [
   { id: 'tech', name: 'Technology', userId: '' },
   { id: 'clothing', name: 'Clothing', userId: '' },
@@ -65,7 +71,7 @@ const PREDEFINED_CATEGORIES: Category[] = [
 ];
 
 const WishlistTracker: React.FC = () => {
-  // =================== STATE ===================
+  // ——— STATE ———
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [categories] = useState<Category[]>(PREDEFINED_CATEGORIES);
   const [filter, setFilter] = useState('all');
@@ -80,36 +86,36 @@ const WishlistTracker: React.FC = () => {
   const [itemPriority, setItemPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [itemPrice, setItemPrice] = useState('');
   const [itemUrl, setItemUrl] = useState('');
-  const [itemCategory, setItemCategory] = useState('');
+  const [itemCategory, setItemCategory] = useState(categories[0]?.id || '');
   const [itemTargetDate, setItemTargetDate] = useState('');
   const [itemImage, setItemImage] = useState('');
 
-  // =================== DATA LOADING ===================
+  // ——— FETCH ———
   const fetchWishlistItems = async (uid: string) => {
     try {
-      const itemsQuery = query(collection(db, 'wishlist'), where('userId', '==', uid));
-      const itemsSnap = await getDocs(itemsQuery);
-      const loadedItems: WishlistItem[] = itemsSnap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() as Omit<WishlistItem, 'id'>),
+      const q = query(
+        collection(db, 'wishlist'),
+        where('userId', '==', uid),
+      );
+      const snap = await getDocs(q);
+      const loaded = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<WishlistItem, 'id'>),
       }));
-      setItems(loadedItems);
-      console.log('Loaded wishlist items:', loadedItems);
-    } catch (err) {
-      console.error('Error loading wishlist items:', err);
+      setItems(loaded);
+    } catch (e) {
+      console.error('Ошибка загрузки wishlist:', e);
     }
   };
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    if (!itemCategory && categories.length > 0) {
-      setItemCategory(categories[0].id);
+    if (uid) {
+      fetchWishlistItems(uid);
     }
-    fetchWishlistItems(uid);
-  }, [itemCategory, categories]);
+  }, []);
 
-  // =================== WISHLIST FORM (CREATE/UPDATE) ===================
+  // ——— FORM HELPERS ———
   const resetForm = () => {
     setItemName('');
     setItemDescription('');
@@ -128,9 +134,7 @@ const WishlistTracker: React.FC = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (reader.result) {
-        setItemImage(reader.result as string);
-      }
+      if (reader.result) setItemImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -138,27 +142,27 @@ const WishlistTracker: React.FC = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!itemPrice.trim() || !itemImage.trim()) {
-      alert('Please fill in the required fields: Price and Image.');
+    if (!itemPrice.trim()) {
+      alert('Поле Price обязательно');
       return;
     }
 
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      alert('User is not logged in!');
+      alert('Пользователь не залогинен');
       return;
     }
 
-    const existingArchiveValue =
-      editingId && items.find((i) => i.id === editingId)
-        ? items.find((i) => i.id === editingId)?.archived || false
+    const existingArchive =
+      editingId && items.find((i) => i.id === editingId)?.archived
+        ? true
         : false;
 
-    const newItemData = {
+    const data = {
       name: itemName,
       description: itemDescription,
       priority: itemPriority,
-      price: itemPrice,
+      price: itemPrice.trim(),      // string, не число
       url: itemUrl,
       category: itemCategory,
       targetDate: itemTargetDate,
@@ -166,27 +170,26 @@ const WishlistTracker: React.FC = () => {
         ? items.find((i) => i.id === editingId)?.createdAt || Date.now()
         : Date.now(),
       image: itemImage,
-      userId: uid,
-      archived: editingId ? existingArchiveValue : false,
+      userId: uid,                  // обязательное поле для правил
+      archived: editingId ? existingArchive : false,
     };
-
-    console.log('Submitting item data:', newItemData);
 
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'wishlist', editingId), newItemData);
+        await updateDoc(doc(db, 'wishlist', editingId), data);
         setItems((prev) =>
-          prev.map((item) => (item.id === editingId ? { id: editingId, ...newItemData } : item))
+          prev.map((it) =>
+            it.id === editingId ? { id: editingId, ...data } : it,
+          ),
         );
       } else {
-        const docRef = await addDoc(collection(db, 'wishlist'), newItemData);
-        setItems((prev) => [...prev, { id: docRef.id, ...newItemData }]);
+        const ref = await addDoc(collection(db, 'wishlist'), data);
+        setItems((prev) => [...prev, { id: ref.id, ...data }]);
       }
-    } catch (err) {
-      console.error('Error saving wishlist item:', err);
+      resetForm();
+    } catch (e) {
+      console.error('Ошибка сохранения:', e);
     }
-
-    resetForm();
   };
 
   const startEditing = (item: WishlistItem) => {
@@ -202,60 +205,54 @@ const WishlistTracker: React.FC = () => {
     setIsAdding(true);
   };
 
-  const handleDeleteItem = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'wishlist', id));
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      console.log('Wishlist item deleted:', id);
-    } catch (err) {
-      console.error('Error deleting wishlist item:', err);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (e) {
+      console.error('Ошибка удаления:', e);
     }
   };
 
-  const toggleArchiveItem = async (item: WishlistItem) => {
+  const toggleArchive = async (item: WishlistItem) => {
     try {
-      await updateDoc(doc(db, 'wishlist', item.id), { archived: !item.archived });
+      await updateDoc(doc(db, 'wishlist', item.id), {
+        archived: !item.archived,
+      });
       setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, archived: !i.archived } : i))
+        prev.map((i) =>
+          i.id === item.id ? { ...i, archived: !i.archived } : i,
+        ),
       );
-      console.log('Item archive toggled:', item.id);
-    } catch (err) {
-      console.error('Error toggling archive:', err);
+    } catch (e) {
+      console.error('Ошибка архивации:', e);
     }
   };
 
-  // =================== IMPORT / EXPORT ===================
+  // ——— IMPORT/EXPORT ———
   const importData = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const data = JSON.parse(reader.result as string);
-        if (!Array.isArray(data.items)) {
-          throw new Error('Invalid JSON format');
-        }
+        const json = JSON.parse(reader.result as string);
+        if (!Array.isArray(json.items)) throw new Error('Неправильный формат');
         const uid = auth.currentUser?.uid;
-        if (!uid) {
-          alert('User not logged in!');
-          return;
-        }
+        if (!uid) throw new Error('Не залогинен');
 
-        for (const rawItem of data.items) {
-          const itemWithUid: Omit<WishlistItem, 'id'> = {
-            ...rawItem,
+        for (const raw of json.items) {
+          await addDoc(collection(db, 'wishlist'), {
+            ...raw,
             userId: uid,
-            archived: rawItem.archived || false,
-          };
-          await addDoc(collection(db, 'wishlist'), itemWithUid);
+            archived: raw.archived || false,
+          });
         }
-
         await fetchWishlistItems(uid);
-        alert('Import successful!');
+        alert('Импорт успешно завершён');
       } catch (err) {
-        alert('Error during import!');
         console.error(err);
+        alert('Ошибка при импорте');
       }
     };
     reader.readAsText(file);
@@ -263,57 +260,50 @@ const WishlistTracker: React.FC = () => {
 
   const exportData = () => {
     try {
-      const exportObj = { items };
-      const jsonStr = JSON.stringify(exportObj, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ items }, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'wishlist_backup.json';
-      link.click();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wishlist_backup.json';
+      a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Error during export');
       console.error(err);
+      alert('Ошибка при экспорте');
     }
   };
 
-  // =================== FILTER & SORT ===================
-  const filteredItems = items.filter(
-    (item) =>
-      (showArchive ? item.archived : !item.archived) &&
-      (filter === 'all' || item.category === filter)
+  // ——— FILTER & SORT ———
+  const filtered = items.filter(
+    (it) =>
+      (showArchive ? it.archived : !it.archived) &&
+      (filter === 'all' || it.category === filter),
   );
 
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === 'date') {
-      return b.createdAt - a.createdAt;
-    } else if (sortBy === 'price') {
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'date') return b.createdAt - a.createdAt;
+    if (sortBy === 'price')
       return (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0);
-    } else if (sortBy === 'priority') {
-      const vals = { high: 3, medium: 2, low: 1 };
-      return vals[b.priority] - vals[a.priority];
+    if (sortBy === 'priority') {
+      const v = { high: 3, medium: 2, low: 1 };
+      return v[b.priority] - v[a.priority];
     }
     return 0;
   });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'bg-red-500';
-      case 'medium':
-        return 'bg-yellow-500';
-      case 'low':
-        return 'bg-green-500';
-      default:
-        return 'bg-gray-500';
-    }
+  const getPriorityColor = (p: string) => {
+    if (p === 'high') return 'bg-red-500';
+    if (p === 'medium') return 'bg-yellow-500';
+    if (p === 'low') return 'bg-green-500';
+    return 'bg-gray-500';
   };
 
-  // =================== RENDER ===================
+  // ——— RENDER ———
   return (
     <div className="p-4 space-y-6">
-      {/* Header: Export / Import */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold">Wishlist</h2>
         <div className="flex gap-3">
@@ -325,7 +315,12 @@ const WishlistTracker: React.FC = () => {
           </button>
           <label className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded flex items-center gap-2 cursor-pointer">
             <Upload size={18} /> Import
-            <input type="file" accept=".json" onChange={importData} className="hidden" />
+            <input
+              type="file"
+              accept=".json"
+              onChange={importData}
+              className="hidden"
+            />
           </label>
           <button
             onClick={() => setShowArchive(!showArchive)}
@@ -336,7 +331,7 @@ const WishlistTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter & Sort */}
+      {/* FILTER & SORT */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-2">
           <select
@@ -345,9 +340,9 @@ const WishlistTracker: React.FC = () => {
             className="bg-gray-700 text-white px-3 py-2 rounded"
           >
             <option value="all">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -371,7 +366,7 @@ const WishlistTracker: React.FC = () => {
         )}
       </div>
 
-      {/* Form: Create / Edit Wishlist Item */}
+      {/* FORM */}
       {isAdding && (
         <div className="bg-gray-700 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
@@ -397,22 +392,26 @@ const WishlistTracker: React.FC = () => {
               </div>
               {/* Category */}
               <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
+                <label className="block text-sm font-medium mb-1">
+                  Category
+                </label>
                 <select
                   value={itemCategory}
                   onChange={(e) => setItemCategory(e.target.value)}
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded"
                 >
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
               </div>
               {/* Price */}
               <div>
-                <label className="block text-sm font-medium mb-1">Price (€)*</label>
+                <label className="block text-sm font-medium mb-1">
+                  Price (€)*
+                </label>
                 <input
                   type="text"
                   value={itemPrice}
@@ -424,10 +423,14 @@ const WishlistTracker: React.FC = () => {
               </div>
               {/* Priority */}
               <div>
-                <label className="block text-sm font-medium mb-1">Priority</label>
+                <label className="block text-sm font-medium mb-1">
+                  Priority
+                </label>
                 <select
                   value={itemPriority}
-                  onChange={(e) => setItemPriority(e.target.value as 'low' | 'medium' | 'high')}
+                  onChange={(e) =>
+                    setItemPriority(e.target.value as 'low' | 'medium' | 'high')
+                  }
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded"
                 >
                   <option value="low">Low</option>
@@ -448,7 +451,9 @@ const WishlistTracker: React.FC = () => {
               </div>
               {/* Target Date */}
               <div>
-                <label className="block text-sm font-medium mb-1">Target Date</label>
+                <label className="block text-sm font-medium mb-1">
+                  Target Date
+                </label>
                 <input
                   type="date"
                   value={itemTargetDate}
@@ -459,21 +464,23 @@ const WishlistTracker: React.FC = () => {
               {/* Image */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Upload Image* {editingId ? '(leave empty to keep current image)' : ''}
+                  Upload Image* {editingId ? '(leave empty to keep current)' : ''}
                 </label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
                   className="block w-full text-sm mt-1 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500"
-                  required={!editingId || (!editingId && !itemImage)}
+                  required={!editingId}
                 />
               </div>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
+              <label className="block text-sm font-medium mb-1">
+                Description
+              </label>
               <textarea
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
@@ -482,7 +489,7 @@ const WishlistTracker: React.FC = () => {
               />
             </div>
 
-            {/* Buttons */}
+            {/* Actions */}
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -502,18 +509,18 @@ const WishlistTracker: React.FC = () => {
         </div>
       )}
 
-      {/* Display Wishlist Items */}
+      {/* ITEMS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sortedItems.length === 0 ? (
+        {sorted.length === 0 ? (
           <div className="col-span-full text-center py-8 bg-gray-700 rounded-lg">
             <p className="text-gray-400">
               {showArchive
                 ? 'No archived wishes found.'
-                : 'No wishes found in this category.'}
+                : 'No wishes in this category.'}
             </p>
           </div>
         ) : (
-          sortedItems.map((item) => (
+          sorted.map((item) => (
             <div
               key={item.id}
               className={`bg-gray-700 rounded-lg p-4 flex flex-col h-full ${
@@ -524,11 +531,17 @@ const WishlistTracker: React.FC = () => {
                 <h3 className="text-lg font-semibold">{item.name}</h3>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => toggleArchiveItem(item)}
+                    onClick={() => toggleArchive(item)}
                     className="p-1 hover:opacity-80"
-                    title={item.archived ? 'Restore Wish' : 'Mark as Completed'}
+                    title={
+                      item.archived ? 'Restore Wish' : 'Mark as Completed'
+                    }
                   >
-                    {item.archived ? <RotateCcw size={18} /> : <Check size={18} />}
+                    {item.archived ? (
+                      <RotateCcw size={18} />
+                    ) : (
+                      <Check size={18} />
+                    )}
                   </button>
                   <button
                     onClick={() => startEditing(item)}
@@ -538,7 +551,7 @@ const WishlistTracker: React.FC = () => {
                     <Edit size={18} />
                   </button>
                   <button
-                    onClick={() => handleDeleteItem(item.id)}
+                    onClick={() => handleDelete(item.id)}
                     className="text-red-400 hover:text-red-300 p-1"
                     title="Delete"
                   >
@@ -547,18 +560,25 @@ const WishlistTracker: React.FC = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mb-2">
-                <span className={`text-xs px-2 py-1 rounded ${getPriorityColor(item.priority)}`}>
-                  {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
+                <span
+                  className={`text-xs px-2 py-1 rounded ${getPriorityColor(
+                    item.priority,
+                  )}`}
+                >
+                  {item.priority.charAt(0).toUpperCase() +
+                    item.priority.slice(1)}
                 </span>
-                {categories.find((c) => c.id === item.category) && (
-                  <span className="text-xs bg-gray-600 px-2 py-1 rounded">
-                    {categories.find((c) => c.id === item.category)?.name}
-                  </span>
-                )}
+                <span className="text-xs bg-gray-600 px-2 py-1 rounded">
+                  {categories.find((c) => c.id === item.category)?.name}
+                </span>
               </div>
               {item.image && (
                 <div className="mb-2">
-                  <img src={item.image} alt="Wish Item" className="max-w-full h-auto rounded" />
+                  <img
+                    src={item.image}
+                    alt="Wish Item"
+                    className="max-w-full h-auto rounded"
+                  />
                 </div>
               )}
               {item.description && (
@@ -576,7 +596,10 @@ const WishlistTracker: React.FC = () => {
                 {item.targetDate && (
                   <div className="flex items-center gap-1 text-sm">
                     <Calendar size={14} className="text-blue-400" />
-                    <span>Target Date: {new Date(item.targetDate).toLocaleDateString()}</span>
+                    <span>
+                      Target Date:{' '}
+                      {new Date(item.targetDate).toLocaleDateString()}
+                    </span>
                   </div>
                 )}
                 {item.url && (
