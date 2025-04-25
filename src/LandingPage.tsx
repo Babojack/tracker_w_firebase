@@ -22,16 +22,65 @@ import {
   BedDouble,
 } from 'lucide-react';
 
+/**
+ * Core tracker modules – now with richer descriptions and concrete examples.
+ * Each example illustrates a real‑world use case so users instantly “get” the value.
+ */
 const modules = [
-  { title: 'Project Tracker',  description: 'Organize projects & milestones.',       icon: <Activity size={32} />,  gif: 'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' },
-  { title: 'Goals Tracker',    description: 'Set and achieve measurable goals.',     icon: <Target size={32} />,    gif: 'https://media.giphy.com/media/26gsl03QLUS4lnwOM/giphy.gif' },
-  { title: 'Mood Tracker',     description: 'Log mood & spot emotional patterns.',  icon: <BarChart2 size={32} />, gif: 'https://media.giphy.com/media/l0HlNQ03J5JxX6lva/giphy.gif' },
-  { title: 'LifeEQ Tracker',   description: 'Keep overall life balance in check.',  icon: <Brain size={32} />,     gif: 'https://media.giphy.com/media/3orieWfIgbngFYwV8k/giphy.gif' },
-  { title: "ToDo's Tracker",   description: 'Tame your task list & beat chaos.',     icon: <Plus size={32} />,      gif: 'https://media.giphy.com/media/10SvWCbt1ytWCc/giphy.gif' },
-  { title: 'Household Budget', description: 'Track income, expenses & balance.',    icon: <Calculator size={32} />,gif: 'https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif' },
-  { title: 'Wishlist Tracker', description: 'Plan purchases & stay motivated.',     icon: <Gift size={32} />,      gif: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif' },
-  { title: 'Travel Planner',   description: 'Plan trips stress‑free & on budget.',  icon: <Plane size={32} />,     gif: 'https://media.giphy.com/media/3oEjHP8ELRNNlnlLGM/giphy.gif' },
-  { title: 'Shopping List',    description: 'Never forget an item again.',          icon: <ShoppingCart size={32} />,gif:'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif' },
+  {
+    title: 'Project Tracker',
+    description: 'Organize projects & milestones in visual boards.',
+    example: 'Kanban board for your app launch with swim‑lanes: Backlog ➜ Coding ➜ Testing ➜ Shipped.',
+    icon: <Activity size={32} />,
+  },
+  {
+    title: 'Goals Tracker',
+    description: 'Set and achieve measurable goals with streaks & reminders.',
+    example: 'SMART goal – “Read 20 pages daily for 30 days” shows streak fire icon when on track.',
+    icon: <Target size={32} />,
+  },
+  {
+    title: 'Mood Tracker',
+    description: 'Log mood & spot emotional patterns in colourful heatmaps.',
+    example: 'Tap an emoji 3× a day; weekly heatmap reveals a mid‑week energy dip.',
+    icon: <BarChart2 size={32} />,
+  },
+  {
+    title: 'LifeEQ Tracker',
+    description: 'Keep overall life balance in check across 8 areas.',
+    example: 'Radar chart instantly shows when “Social” drops below “Work” stress zone.',
+    icon: <Brain size={32} />,
+  },
+  {
+    title: "ToDo's Tracker",
+    description: 'Tame your task list & beat chaos with prioritised queues.',
+    example: 'Quick‑add “Pay rent” – AI suggests due date & category automatically.',
+    icon: <Plus size={32} />,
+  },
+  {
+    title: 'Household Budget',
+    description: 'Track income, expenses & balance in one glance.',
+    example: 'Snap a grocery receipt; pie chart updates and warns when groceries > 30% of budget.',
+    icon: <Calculator size={32} />,
+  },
+  {
+    title: 'Wishlist Tracker',
+    description: 'Plan purchases & stay motivated with saving progress.',
+    example: 'Add “Nintendo Switch” – progress bar fills as you set money aside each week.',
+    icon: <Gift size={32} />,
+  },
+  {
+    title: 'Travel Planner',
+    description: 'Plan trips stress‑free with budgets, itineraries & packing lists.',
+    example: '5‑day Rome template auto‑calculates daily food budget & reminds you to pack adapters.',
+    icon: <Plane size={32} />,
+  },
+  {
+    title: 'Shopping List',
+    description: 'Never forget an item again – lists sync in real‑time with family.',
+    example: 'Partner adds “oat milk” from home; it pops onto your list in the store aisle.',
+    icon: <ShoppingCart size={32} />,
+  },
 ];
 
 const stats = [
@@ -59,25 +108,35 @@ const containerVariants = { hidden: {}, show: { transition: { staggerChildren: 0
 const fadeInUp           = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.6 } } };
 
 const LandingPage: React.FC = () => (
-  <motion.div initial="hidden" animate="show" variants={containerVariants} className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-
+  <motion.div
+    initial="hidden"
+    animate="show"
+    variants={containerVariants}
+    className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 to-gray-800 text-white"
+  >
+    {/* Hero */}
     <motion.section variants={fadeInUp} className="text-center py-20 px-4">
-      <h1 className="text-5xl font-bold mb-4">Built for <span className="text-blue-500">brains that bounce</span></h1>
+      <h1 className="text-5xl font-bold mb-4">
+        Built for <span className="text-blue-500">brains that bounce</span>
+      </h1>
       <p className="text-xl max-w-2xl mx-auto text-gray-300 mb-8">
-        One unified dashboard for focus, finances, feelings — designed with ADHD & Autistic brains in mind.
+        One unified dashboard for focus, finances, feelings — designed with ADHD & Autistic brains in mind.
       </p>
-      <Link to="/signup" className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600">
-        Try it Free
+      <Link
+        to="/signup"
+        className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600"
+      >
+        Try it Free
       </Link>
     </motion.section>
 
-    {/* Why MyTracker */}
+    {/* Why */}
     <motion.section variants={fadeInUp} className="bg-gray-800/50 py-12 px-4">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
         <div>
-          <h2 className="text-3xl font-bold mb-4">Why MyTracker?</h2>
+          <h2 className="text-3xl font-bold mb-4">Why MyTracker?</h2>
           <ul className="list-disc list-inside space-y-3 text-gray-300">
-            <li><b>Zero context‑switching.</b> All life‑areas live in one clean screen.</li>
+            <li><b>Zero context-switching.</b> All life‑areas live in one clean screen.</li>
             <li><b>Brain‑friendly UI.</b> Big buttons, calm colors, no information overload.</li>
             <li><b>Instant dopamine hits.</b> Micro‑rewards & colourful progress bars.</li>
             <li><b>Data that helps.</b> Mood heatmaps, budget trends, project burndown.</li>
@@ -85,9 +144,11 @@ const LandingPage: React.FC = () => (
           </ul>
         </div>
         <div className="bg-gray-900/60 rounded-lg p-6">
-          <h3 className="text-2xl font-semibold mb-4 flex items-center gap-2"><Clock size={24}/> Daily Flow (24‑hour guide)</h3>
+          <h3 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <Clock size={24} /> Daily Flow (24‑hour guide)
+          </h3>
           <ol className="space-y-3">
-            {timeline.map(step => (
+            {timeline.map((step) => (
               <li key={step.time} className="flex items-start gap-3">
                 <span className="text-purple-400 w-14">{step.time}</span>
                 <span className="text-purple-300">{step.icon}</span>
@@ -115,7 +176,7 @@ const LandingPage: React.FC = () => (
       </div>
     </motion.section>
 
-    {/* Core trackers flip cards */}
+    {/* Core Trackers */}
     <motion.section variants={fadeInUp} className="bg-gray-800/40 py-12 px-4">
       <div className="max-w-6xl mx-auto text-center mb-8">
         <h2 className="text-3xl font-bold">Core Trackers</h2>
@@ -123,15 +184,17 @@ const LandingPage: React.FC = () => (
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
         {modules.map((mod, idx) => (
-          <div key={idx} className="flip-card h-64">
+          <div key={idx} className="flip-card h-72">
             <div className="flip-card-inner">
+              {/* Front */}
               <div className="flip-card-front p-6 bg-gray-700/50 rounded-lg flex flex-col items-center justify-center text-center">
                 {mod.icon}
                 <h3 className="text-xl font-semibold mt-4">{mod.title}</h3>
               </div>
-              <div className="flip-card-back p-6 bg-gray-800 rounded-lg flex flex-col items-center justify-center text-center">
-                <p className="text-gray-300 mb-4">{mod.description}</p>
-                <img src={mod.gif} alt={`${mod.title} GIF`} className="max-h-32 rounded-lg shadow-lg" loading="lazy" />
+              {/* Back */}
+              <div className="flip-card-back p-6 bg-gray-800 rounded-lg flex flex-col items-start justify-center text-left space-y-2">
+                <p className="text-gray-300 font-semibold leading-snug">{mod.description}</p>
+                <p className="text-gray-400 text-xs italic">{mod.example}</p>
               </div>
             </div>
           </div>
@@ -154,16 +217,19 @@ const LandingPage: React.FC = () => (
       </div>
     </motion.section>
 
-    {/* Final CTA */}
+    {/* CTA */}
     <motion.section variants={fadeInUp} className="text-center py-12 px-4">
       <h2 className="text-2xl font-bold mb-4">Start your focus journey today</h2>
-      <Link to="/signup" className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600">
-        Create Your Free Account
+      <Link
+        to="/signup"
+        className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full font-semibold hover:from-purple-700 hover:to-blue-600"
+      >
+        Create Your Free Account
       </Link>
     </motion.section>
 
     <motion.footer variants={fadeInUp} className="p-6 text-center bg-gray-900 text-gray-400">
-      <p>© 2025 MyTracker — Designed by neurodiverse devs for neurodiverse minds.</p>
+      <p>© 2025 MyTracker — Designed by neurodiverse devs for neurodiverse minds.</p>
     </motion.footer>
   </motion.div>
 );
