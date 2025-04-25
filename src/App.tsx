@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import {
@@ -20,7 +19,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import ProfileSettings from './components/ProfileSettings';
 import DailyFlow from './components/trackers/DailyFlow';
-// Lazy‑load тяжёлые трекеры, чтобы ускорить старт.
 const ProjectTracker = lazy(() => import('./components/trackers/ProjectTracker'));
 const GoalsTracker = lazy(() => import('./components/trackers/GoalsTracker'));
 const MoodTracker = lazy(() => import('./components/trackers/MoodTracker'));
@@ -37,7 +35,6 @@ import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-// Варианты анимации страниц
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.35 } },
@@ -64,29 +61,28 @@ interface Tab {
   Icon: React.ElementType;
 }
 
-// Конфиг таймлайна (можно позже тянуть из API)
 const dailyFlow = [
-  { time: '07:00', icon: <Clock size={20} />,          title: 'Morning Snapshot',   desc: 'Quick mood log & review today’s goals.' },
-  { time: '09:00', icon: <BookOpen size={20} />,       title: 'Deep‑Work Block',    desc: 'Start Focus Timer in Project Tracker.' },
-  { time: '12:30', icon: <Plus size={20} />,           title: 'Lunch & Reflect',    desc: 'Update Mood, tick completed tasks.' },
-  { time: '15:00', icon: <Calculator size={20} />,     title: 'Budget Check‑in',    desc: 'Log any expenses, update balance.' },
-  { time: '18:00', icon: <Target size={20} />,         title: 'Evening Wind‑Down',  desc: 'Review progress & plan tomorrow.' },
-  { time: '22:30', icon: <Brain size={20} />,          title: 'Sleep & Sync',       desc: 'All data auto‑syncs. Time to rest.' },
+  { time: '07:00', icon: <Clock size={20} />, title: 'Morning Snapshot', desc: 'Quick mood log & review today’s goals.' },
+  { time: '09:00', icon: <BookOpen size={20} />, title: 'Deep‑Work Block', desc: 'Start Focus Timer in Project Tracker.' },
+  { time: '12:30', icon: <Plus size={20} />, title: 'Lunch & Reflect', desc: 'Update Mood, tick completed tasks.' },
+  { time: '15:00', icon: <Calculator size={20} />, title: 'Budget Check‑in', desc: 'Log any expenses, update balance.' },
+  { time: '18:00', icon: <Target size={20} />, title: 'Evening Wind‑Down', desc: 'Review progress & plan tomorrow.' },
+  { time: '22:30', icon: <Brain size={20} />, title: 'Sleep & Sync', desc: 'All data auto‑syncs. Time to rest.' },
 ];
 
 const tabs: Tab[] = [
   { id: 'dashboard', name: 'Dashboard', Icon: BarChart2 },
-  { id: 'projects',  name: 'Project Tracker', Icon: Activity },
-  { id: 'goals',     name: 'Goals Tracker',   Icon: Target },
-  { id: 'mood',      name: 'Mood Tracker',    Icon: BarChart2 },
-  { id: 'lifeEQ',    name: 'LifeEQ Tracker',  Icon: Brain },
-  { id: 'todos',     name: "ToDo's",         Icon: Plus },
-  { id: 'budget',    name: 'Household Budget',Icon: Calculator },
-  { id: 'wishlist',  name: 'Wishlist',        Icon: Gift },
-  { id: 'books',     name: 'Book Tracker',    Icon: BookOpen },
-  { id: 'shopping',  name: 'Shopping List',   Icon: ShoppingCart },
-  { id: 'travel',    name: 'Travel Planner',  Icon: Plane },
-  { id: 'flow',      name: 'Daily Flow',      Icon: Clock },
+  { id: 'projects', name: 'Project Tracker', Icon: Activity },
+  { id: 'goals', name: 'Goals Tracker', Icon: Target },
+  { id: 'mood', name: 'Mood Tracker', Icon: BarChart2 },
+  { id: 'lifeEQ', name: 'LifeEQ Tracker', Icon: Brain },
+  { id: 'todos', name: "ToDo's", Icon: Plus },
+  { id: 'budget', name: 'Household Budget', Icon: Calculator },
+  { id: 'wishlist', name: 'Wishlist', Icon: Gift },
+  { id: 'books', name: 'Book Tracker', Icon: BookOpen },
+  { id: 'shopping', name: 'Shopping List', Icon: ShoppingCart },
+  { id: 'travel', name: 'Travel Planner', Icon: Plane },
+  { id: 'flow', name: 'Daily Flow', Icon: Clock },
 ];
 
 const App: React.FC = () => {
@@ -98,7 +94,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
-  // Подписка на изменение авторизации
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -107,7 +102,6 @@ const App: React.FC = () => {
     return unsub;
   }, []);
 
-  // Синхронизация URL ↔️ активная вкладка
   useEffect(() => {
     const urlTab = new URLSearchParams(location.search).get('tab') as TabId | null;
     if (urlTab) {
@@ -116,7 +110,6 @@ const App: React.FC = () => {
     }
   }, [location.search]);
 
-  // Подтягиваем последнюю вкладку из Firestore
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -139,19 +132,19 @@ const App: React.FC = () => {
     if (user) await setDoc(doc(db, 'userSettings', user.uid), { activeTab: tab }, { merge: true });
   };
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen text-white">
         <p>Loading…</p>
       </div>
     );
+  }
 
   if (!user) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-4 relative">
       <div className="max-w-7xl mx-auto">
-        {/* Навигационная панель */}
         <nav className="flex flex-wrap gap-2 mb-6">
           {tabs.map(({ id, name, Icon }) => (
             <button
@@ -174,7 +167,6 @@ const App: React.FC = () => {
           </button>
         </nav>
 
-        {/* Контент */}
         <div className="bg-gray-800/50 rounded-lg p-6 min-h-[400px]">
           <AnimatePresence mode="wait">
             {showProfileSettings ? (
@@ -185,17 +177,17 @@ const App: React.FC = () => {
               <motion.div key={activeTab} variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <Suspense fallback={<p className="text-center p-6">Loading module…</p>}>
                   {activeTab === 'dashboard' && <Dashboard />}
-                  {activeTab === 'projects'  && <ProjectTracker />}
-                  {activeTab === 'goals'     && <GoalsTracker />}
-                  {activeTab === 'mood'      && <MoodTracker />}
-                  {activeTab === 'lifeEQ'    && <LifeEQTracker />}
-                  {activeTab === 'todos'     && <TodoTracker />}
-                  {activeTab === 'budget'    && <HouseholdBudgetCalculator />}
-                  {activeTab === 'wishlist'  && <WishlistTracker />}
-                  {activeTab === 'books'     && <BookTracker />}
-                  {activeTab === 'shopping'  && <ShoppingListTracker />}
-                  {activeTab === 'travel'    && <TravelPlanner />}
-                  {activeTab === 'flow'      && <DailyFlow items={dailyFlow} />}
+                  {activeTab === 'projects' && <ProjectTracker />}
+                  {activeTab === 'goals' && <GoalsTracker />}
+                  {activeTab === 'mood' && <MoodTracker />}
+                  {activeTab === 'lifeEQ' && <LifeEQTracker />}
+                  {activeTab === 'todos' && <TodoTracker />}
+                  {activeTab === 'budget' && <HouseholdBudgetCalculator />}
+                  {activeTab === 'wishlist' && <WishlistTracker />}
+                  {activeTab === 'books' && <BookTracker />}
+                  {activeTab === 'shopping' && <ShoppingListTracker />}
+                  {activeTab === 'travel' && <TravelPlanner />}
+                  {activeTab === 'flow' && <DailyFlow items={dailyFlow} />}
                 </Suspense>
               </motion.div>
             )}
@@ -203,7 +195,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Плавающий ассистент */}
       <Suspense fallback={null}>
         <FloatingChatGPT />
       </Suspense>
