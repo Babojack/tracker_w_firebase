@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Clock,
@@ -10,6 +10,12 @@ import {
   Target,
   BedDouble,
 } from 'lucide-react';
+
+// Firebase imports – passe den Pfad zu deiner initialisierten Instanz an
+import { db } from "../../firebaseConfig";
+
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 export interface FlowItem {
   id?: string;
@@ -40,19 +46,34 @@ const itemVariants = {
 };
 
 interface Props {
+  /**
+   * Items können optional übergeben werden – z. B. für SSR oder Tests.
+   * Wenn Firestore-Daten eintreffen, werden sie überschrieben.
+   */
   items?: FlowItem[];
+  /**
+   * Optional anderes Datum im Format YYYY-MM-DD. Standard: heutiges Datum.
+   */
+  dateKey?: string;
   heading?: string;
   className?: string;
-  onChange?: (items: FlowItem[]) => void;
 }
 
+/**
+ * Synct die Tages-Items automatisch in Firestore unter
+ * /users/{uid}/dailyFlow/{dateKey}
+ */
 const DailyFlow: React.FC<Props> = ({
-  items: initial = [],
+  items: initialItems = [],
+  dateKey = new Date().toISOString().slice(0, 10),
   heading = 'My Daily Plan',
   className = '',
-  onChange,
 }) => {
-  const [items, setItems] = useState<FlowItem[]>(normalise(initial));
+  const auth = getAuth();
+  const uid = auth.currentUser?.uid;
+  const docRef = uid ? doc(db, 'users', uid, 'dailyFlow', dateKey) : null;
+
+  const [items, setItems] = useState<FlowItem[]>(normalise(initialItems));
   const [form, setForm] = useState({
     time: '',
     title: '',
@@ -60,13 +81,32 @@ const DailyFlow: React.FC<Props> = ({
     iconKey: 'clock' as IconKey,
   });
 
+  /**
+   * Realtime-Sync aus Firestore ➜ State
+   */
   useEffect(() => {
-    setItems(normalise(initial));
-  }, [JSON.stringify(initial)]);
+    if (!docRef) return;
+    const unsub = onSnapshot(docRef, (snap) => {
+      const data = snap.data();
+      if (data?.items) setItems(normalise(data.items));
+    });
+    return unsub;
+  }, [uid, dateKey]);
+
+  /**
+   * Schreibt aktuelle Items nach Firestore.
+   */
+  const persist = useCallback(
+    async (next: FlowItem[]) => {
+      if (!docRef) return;
+      await setDoc(docRef, { items: next }, { merge: true });
+    },
+    [docRef]
+  );
 
   const update = (next: FlowItem[]) => {
     setItems(next);
-    onChange?.(next);
+    persist(next);
   };
 
   const addItem = () => {
@@ -91,7 +131,9 @@ const DailyFlow: React.FC<Props> = ({
           <Clock size={24} /> {heading}
         </h3>
 
-        {items.length === 0 && <p className="text-gray-400">No steps yet — add one below.</p>}
+        {items.length === 0 && (
+          <p className="text-gray-400">No steps yet — add one below.</p>
+        )}
 
         <motion.ol variants={listVariants} initial="hidden" animate="show" className="space-y-3">
           {items.map(({ id, time, title, desc, iconKey }) => (
