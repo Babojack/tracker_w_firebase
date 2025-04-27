@@ -14,13 +14,13 @@ import {
   BookOpen,
   User,
   Clock,
+  Film,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import Dashboard from './components/Dashboard';
 import ProfileSettings from './components/ProfileSettings';
 import DailyFlow from './components/trackers/DailyFlow';
-
 const ProjectTracker = lazy(() => import('./components/trackers/ProjectTracker'));
 const GoalsTracker   = lazy(() => import('./components/trackers/GoalsTracker'));
 const MoodTracker    = lazy(() => import('./components/trackers/MoodTracker'));
@@ -29,13 +29,14 @@ const TodoTracker    = lazy(() => import('./components/trackers/TodoTracker'));
 const HouseholdBudgetCalculator = lazy(
   () => import('./components/trackers/HouseholdBudgetCalculator')
 );
-const WishlistTracker = lazy(() => import('./components/trackers/WishlistTracker'));
-const TravelPlanner   = lazy(() => import('./components/trackers/TravelPlanner'));
-const ShoppingListTracker = lazy(
+const WishlistTracker      = lazy(() => import('./components/trackers/WishlistTracker'));
+const TravelPlanner        = lazy(() => import('./components/trackers/TravelPlanner'));
+const ShoppingListTracker  = lazy(
   () => import('./components/trackers/ShoppingListTracker')
 );
-const FloatingChatGPT = lazy(() => import('./components/trackers/FloatingChatGPT'));
-const BookTracker     = lazy(() => import('./components/trackers/BookTracker'));
+const MovieWishlist        = lazy(() => import('./components/trackers/MovieWishlist'));
+const FloatingChatGPT      = lazy(() => import('./components/trackers/FloatingChatGPT'));
+const BookTracker          = lazy(() => import('./components/trackers/BookTracker'));
 
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -56,6 +57,7 @@ export type TabId =
   | 'todos'
   | 'budget'
   | 'wishlist'
+  | 'movies'
   | 'travel'
   | 'shopping'
   | 'books'
@@ -76,6 +78,7 @@ const tabs: Tab[] = [
   { id: 'todos',     name: "ToDo's",          Icon: Plus },
   { id: 'budget',    name: 'Household Budget',Icon: Calculator },
   { id: 'wishlist',  name: 'Wishlist',        Icon: Gift },
+  { id: 'movies',    name: 'Movie Wishlist',  Icon: Film },
   { id: 'books',     name: 'Book Tracker',    Icon: BookOpen },
   { id: 'shopping',  name: 'Shopping List',   Icon: ShoppingCart },
   { id: 'travel',    name: 'Travel Planner',  Icon: Plane },
@@ -100,7 +103,7 @@ const App: React.FC = () => {
     return unsub;
   }, []);
 
-  // 2) Tab aus URL lesen
+  // 2) Tab from URL
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab') as TabId | null;
     if (tab) {
@@ -109,13 +112,12 @@ const App: React.FC = () => {
     }
   }, [location.search]);
 
-  // 3) Tab vom Firestore holen / speichern
+  // 3) Firestore userSettings
   useEffect(() => {
     if (!user) return;
     (async () => {
       const ref  = doc(db, 'userSettings', user.uid);
       const snap = await getDoc(ref);
-      // nur laden, wenn kein tab in der URL steht
       if (!new URLSearchParams(location.search).get('tab')) {
         if (snap.exists()) {
           const data = snap.data() as { activeTab: TabId };
@@ -174,7 +176,7 @@ const App: React.FC = () => {
           </button>
         </nav>
 
-        {/* Haupt-Content */}
+        {/* Main Content */}
         <div className="bg-gray-800/50 rounded-lg p-6 min-h-[400px]">
           <AnimatePresence mode="wait">
             {showProfileSettings ? (
@@ -206,8 +208,8 @@ const App: React.FC = () => {
                   {activeTab === 'wishlist'  && <WishlistTracker />}
                   {activeTab === 'books'     && <BookTracker />}
                   {activeTab === 'shopping'  && <ShoppingListTracker />}
+                  {activeTab === 'movies'    && <MovieWishlist />}
                   {activeTab === 'travel'    && <TravelPlanner />}
-                  {/* DailyFlow ohne items-Prop */}
                   {activeTab === 'flow'      && <DailyFlow />}
                 </Suspense>
               </motion.div>
