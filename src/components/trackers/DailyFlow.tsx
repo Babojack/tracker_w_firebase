@@ -1,28 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+// src/components/DailyFlow.tsx
+import React, { useEffect, useState } from 'react';
 import {
   Clock,
   PlusCircle,
-  Trash,
+  X,
   BookOpenCheck,
   CheckCircle2,
   Calculator,
   Target,
   BedDouble,
 } from 'lucide-react';
-
-// Firebase imports – passe den Pfad zu deiner initialisierten Instanz an
-import { db } from "../../firebaseConfig";
-
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc as firestoreDoc,
+} from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
 
 export interface FlowItem {
-  id?: string;
+  id: string;
   time: string;
   title: string;
   desc?: string;
-  iconKey?: IconKey;
+  iconKey: IconKey;
 }
 
 type IconKey = 'clock' | 'book' | 'check' | 'calc' | 'target' | 'bed';
@@ -36,44 +40,8 @@ const iconOptions: Record<IconKey, React.ReactNode> = {
   bed: <BedDouble size={18} />,
 };
 
-const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const normalise = (arr: FlowItem[]) => arr.map((s) => ({ ...s, id: s.id ?? genId() }));
-
-const listVariants = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
-const itemVariants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
-
-interface Props {
-  /**
-   * Items können optional übergeben werden – z. B. für SSR oder Tests.
-   * Wenn Firestore-Daten eintreffen, werden sie überschrieben.
-   */
-  items?: FlowItem[];
-  /**
-   * Optional anderes Datum im Format YYYY-MM-DD. Standard: heutiges Datum.
-   */
-  dateKey?: string;
-  heading?: string;
-  className?: string;
-}
-
-/**
- * Synct die Tages-Items automatisch in Firestore unter
- * /users/{uid}/dailyFlow/{dateKey}
- */
-const DailyFlow: React.FC<Props> = ({
-  items: initialItems = [],
-  dateKey = new Date().toISOString().slice(0, 10),
-  heading = 'My Daily Plan',
-  className = '',
-}) => {
-  const auth = getAuth();
-  const uid = auth.currentUser?.uid;
-  const docRef = uid ? doc(db, 'users', uid, 'dailyFlow', dateKey) : null;
-
-  const [items, setItems] = useState<FlowItem[]>(normalise(initialItems));
+const DailyFlow: React.FC = () => {
+  const [items, setItems] = useState<FlowItem[]>([]);
   const [form, setForm] = useState({
     time: '',
     title: '',
@@ -81,131 +49,123 @@ const DailyFlow: React.FC<Props> = ({
     iconKey: 'clock' as IconKey,
   });
 
-  /**
-   * Realtime-Sync aus Firestore ➜ State
-   */
+  // Ключ по дате, чтобы отдельный список на каждый день
+  const dateKey = new Date().toISOString().slice(0, 10);
+
+  // Загрузка существующих шагов из Firestore
   useEffect(() => {
-    if (!docRef) return;
-    const unsub = onSnapshot(docRef, (snap) => {
-      const data = snap.data();
-      if (data?.items) setItems(normalise(data.items));
-    });
-    return unsub;
-  }, [uid, dateKey]);
+    const load = async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      const q = query(
+        collection(db, 'dailyFlows'),
+        where('userId', '==', uid),
+        where('date', '==', dateKey)
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<FlowItem, 'id'>)
+      }));
+      // сортируем по времени
+      data.sort((a, b) => a.time.localeCompare(b.time));
+      setItems(data);
+    };
+    load();
+  }, [dateKey]);
 
-  /**
-   * Schreibt aktuelle Items nach Firestore.
-   */
-  const persist = useCallback(
-    async (next: FlowItem[]) => {
-      if (!docRef) return;
-      await setDoc(docRef, { items: next }, { merge: true });
-    },
-    [docRef]
-  );
-
-  const update = (next: FlowItem[]) => {
-    setItems(next);
-    persist(next);
-  };
-
-  const addItem = () => {
+  // Добавление нового шага
+  const addItem = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      alert('Пожалуйста, войдите в аккаунт');
+      return;
+    }
     if (!form.time || !form.title) return;
-    const newStep: FlowItem = { id: genId(), ...form };
-    const sorted = [...items, newStep].sort((a, b) => a.time.localeCompare(b.time));
-    update(sorted);
+    const payload = {
+      ...form,
+      userId: uid,
+      date: dateKey,
+    };
+    const ref = await addDoc(collection(db, 'dailyFlows'), payload);
+    const newItem: FlowItem = { id: ref.id, ...form };
+    setItems(prev => [...prev, newItem].sort((a, b) => a.time.localeCompare(b.time)));
     setForm({ time: '', title: '', desc: '', iconKey: 'clock' });
   };
 
-  const removeItem = (id?: string) => id && update(items.filter((i) => i.id !== id));
+  // Удаление шага
+  const removeItem = async (id: string) => {
+    await deleteDoc(firestoreDoc(db, 'dailyFlows', id));
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      <motion.div
-        variants={itemVariants}
-        initial="hidden"
-        animate="show"
-        className="bg-gray-900/60 rounded-lg p-6"
-      >
-        <h3 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-          <Clock size={24} /> {heading}
-        </h3>
+    <div className="w-full space-y-6 p-4 bg-gray-900 text-white rounded-lg">
+      <h2 className="text-2xl font-bold flex items-center gap-2">
+        <Clock size={24} /> Мой план на {dateKey}
+      </h2>
 
-        {items.length === 0 && (
-          <p className="text-gray-400">No steps yet — add one below.</p>
-        )}
-
-        <motion.ol variants={listVariants} initial="hidden" animate="show" className="space-y-3">
-          {items.map(({ id, time, title, desc, iconKey }) => (
-            <motion.li key={id} variants={itemVariants} className="flex items-start gap-3 group">
-              <span className="text-purple-400 w-14 font-mono">{time}</span>
-              <span className="text-purple-300">{iconKey && iconOptions[iconKey]}</span>
-              <div className="flex-1">
-                <p className="font-semibold">{title}</p>
-                {desc && <p className="text-gray-400 text-sm">{desc}</p>}
+      <ul className="space-y-3">
+        {items.map(item => (
+          <li
+            key={item.id}
+            className="flex items-center justify-between bg-gray-800 p-3 rounded-lg"
+          >
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-purple-400 w-12">{item.time}</span>
+              <span className="text-purple-300">{iconOptions[item.iconKey]}</span>
+              <div>
+                <p className="font-semibold">{item.title}</p>
+                {item.desc && <p className="text-gray-400 text-sm">{item.desc}</p>}
               </div>
-              {id && (
-                <button
-                  onClick={() => removeItem(id)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition"
-                >
-                  <Trash size={16} />
-                </button>
-              )}
-            </motion.li>
-          ))}
-        </motion.ol>
-      </motion.div>
+            </div>
+            <button onClick={() => removeItem(item.id)}>
+              <X size={16} className="text-red-500" />
+            </button>
+          </li>
+        ))}
+        {items.length === 0 && <p className="text-gray-400">Нет шагов — добавьте ниже.</p>}
+      </ul>
 
-      <div className="bg-gray-900/60 rounded-lg p-6">
-        <h4 className="text-lg font-medium mb-4 flex items-center gap-2">
-          <PlusCircle size={18} /> Add new step
-        </h4>
-        <div className="grid md:grid-cols-4 gap-4">
+      <div className="bg-gray-800 p-4 rounded-lg">
+        <div className="flex flex-col md:flex-row gap-2">
           <input
             type="time"
             value={form.time}
-            onChange={(e) => setForm({ ...form, time: e.target.value })}
-            className="bg-gray-800 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-purple-600"
-            required
+            onChange={e => setForm({ ...form, time: e.target.value })}
+            className="flex-1 p-2 rounded bg-gray-700 outline-none"
           />
           <input
             type="text"
-            placeholder="Title"
+            placeholder="Заголовок"
             value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="bg-gray-800 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-purple-600"
-            required
+            onChange={e => setForm({ ...form, title: e.target.value })}
+            className="flex-2 p-2 rounded bg-gray-700 outline-none"
           />
           <input
             type="text"
-            placeholder="Description (optional)"
+            placeholder="Описание (опционально)"
             value={form.desc}
-            onChange={(e) => setForm({ ...form, desc: e.target.value })}
-            className="bg-gray-800 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-purple-600"
+            onChange={e => setForm({ ...form, desc: e.target.value })}
+            className="flex-2 p-2 rounded bg-gray-700 outline-none"
           />
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(iconOptions) as IconKey[]).map((k) => (
-              <button
-                type="button"
-                key={k}
-                onClick={() => setForm({ ...form, iconKey: k })}
-                className={`p-2 rounded-lg border ${
-                  form.iconKey === k ? 'border-purple-500 bg-purple-500/20' : 'border-gray-700'
-                } hover:border-purple-500 transition`}
-              >
-                {iconOptions[k]}
-              </button>
+          <select
+            value={form.iconKey}
+            onChange={e => setForm({ ...form, iconKey: e.target.value as IconKey })}
+            className="p-2 rounded bg-gray-700"
+          >
+            {Object.keys(iconOptions).map(k => (
+              <option key={k} value={k}>
+                {k}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
-
         <button
           onClick={addItem}
-          disabled={!form.time || !form.title}
-          className="mt-4 px-4 py-2 bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+          className="mt-3 px-4 py-2 bg-green-600 rounded hover:bg-green-700"
         >
-          Add
+          <PlusCircle className="inline mb-1" /> Добавить шаг
         </button>
       </div>
     </div>
