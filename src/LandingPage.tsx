@@ -23,37 +23,37 @@ import {
 
 const screenshots = [
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 13.44.08.png',
+    src: '1.png',
     alt: 'Project Tracker Screenshot',
     title: 'Project Tracker',
     description: 'Project Tracker helps you structure your ideas into clear steps, set milestones, and visualize progress in boards or timelines. From app launches to personal goals — everything stays organized and moving forward.',
   },
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 13.47.55.png',
+    src: 'public/2.png',
     alt: 'Mood Tracker Screenshot',
     title: 'Mood Tracker',
     description: 'Mood Tracker lets you log how you feel throughout the day and spot emotional patterns over time. Colourful heatmaps and mood trends help you understand what lifts you up — and what drags you down. Understanding your mood patterns helps you catch emotional dips before they spiral. It gives you the power to recognize triggers, build healthier routines, and care for your mental well-being more intentionally',
   },
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 13.53.29.png',
+    src: 'public/3.png',
     alt: 'Life Balance EQ',
     title: 'Life Balance EQ',
     description: 'LifeEQ Tracker helps you keep your life in balance by visualizing how much time and energy you invest across different areas — like work, health, relationships, and fun. A radar chart gives you instant insight when one zone starts to dominate or drop.',
   },
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 13.55.41.png',
+    src: 'public/4.png',
     alt: 'Movie Tracker Screenshot',
     title: 'Movies Tracker',
     description: 'Movie Tracker lets you create and manage personalized watchlists, rate what you’ve seen, and get reminded of upcoming releases. Whether it’s a cozy rewatch or a cinema night plan — your film life, all in one place',
   },
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 14.04.28.png',
+    src: 'public/5.png',
     alt: 'Books Tracker Screenshot',
     title: 'Books Tracker',
     description: 'The Book Tracker helps you engage more deeply with what you read by adding personal conclusions, remarks, and exercises to each book. It’s your interactive reading journal — where thoughts don’t get lost and every book leaves a trace',
   },
   {
-    src: 'public/Bildschirmfoto 2025-04-29 um 14.11.04.png',
+    src: 'public/6.png',
     alt: 'Wish Tracker Screenshot',
     title: 'Wish Tracker',
     description: 'Wish Tracker helps you keep track of the things you truly want — from small everyday wishes to big life goals. Add notes, track your progress, and stay motivated as you move closer to making each wish a reality',
