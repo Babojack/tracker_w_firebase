@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Search as SearchIcon } from 'lucide-react';
+import { X, Search as SearchIcon, Star } from 'lucide-react';
 import {
   collection,
   doc,
@@ -21,7 +21,6 @@ interface NoteItem {
   result?: string;
 }
 
-// Three possible statuses for each book entry
 const statuses = ['Next Book', 'Reading', 'Read'] as const;
 type Status = typeof statuses[number];
 
@@ -36,6 +35,8 @@ interface BookEntry {
   exercises: NoteItem[];
   remarks: NoteItem[];
   timestamp: string;
+  userId: string;
+  rating?: number;
 }
 
 interface OLDoc {
@@ -45,9 +46,25 @@ interface OLDoc {
   cover_i?: number;
 }
 
-// Use only these two note sections:
 const noteSections = ['conclusions', 'remarks'] as const;
 type NoteSection = typeof noteSections[number];
+
+const StarRating: React.FC<{ rating: number; onChange: (val: number) => void }> = ({
+  rating,
+  onChange,
+}) => (
+  <div className="flex space-x-1">
+    {[1, 2, 3, 4, 5].map(star => (
+      <button
+        key={star}
+        onClick={() => onChange(star)}
+        className={`text-yellow-400 ${star <= rating ? '' : 'opacity-30'}`}
+      >
+        <Star size={18} fill="currentColor" />
+      </button>
+    ))}
+  </div>
+);
 
 const BookTracker: React.FC = () => {
   const [queryText, setQueryText] = useState('');
@@ -55,13 +72,9 @@ const BookTracker: React.FC = () => {
   const [entries, setEntries] = useState<BookEntry[]>([]);
   const timeoutRef = useRef<number>();
 
-  // Load saved books
   useEffect(() => {
     (async () => {
-      const q = query(
-        collection(db, 'booksRead'),
-        where('userId', '==', auth.currentUser?.uid || '')
-      );
+      const q = query(collection(db, 'booksRead'), where('userId', '==', auth.currentUser?.uid || ''));
       const snap = await getDocs(q);
       const data: BookEntry[] = [];
       snap.forEach(docSnap => data.push({ id: docSnap.id, ...(docSnap.data() as any) }));
@@ -69,7 +82,6 @@ const BookTracker: React.FC = () => {
     })();
   }, []);
 
-  // OpenLibrary search
   useEffect(() => {
     if (queryText.trim().length < 3) {
       setSuggestions([]);
@@ -102,15 +114,15 @@ const BookTracker: React.FC = () => {
       exercises: [],
       remarks: [],
       timestamp: new Date().toISOString(),
-      userId: auth.currentUser?.uid,
-    } as any;
+      userId: auth.currentUser?.uid || '',
+      rating: 0,
+    };
     const ref = await addDoc(collection(db, 'booksRead'), entry);
     setEntries(prev => [{ id: ref.id, ...entry }, ...prev]);
     setSuggestions([]);
     setQueryText('');
   };
 
-  // Cycle through statuses: Next Book -> Reading -> Read -> Next Book
   const cycleStatus = async (id: string) => {
     setEntries(prev =>
       prev.map(e => {
@@ -125,6 +137,13 @@ const BookTracker: React.FC = () => {
       const nextIndex = (statuses.indexOf(book.status) + 1) % statuses.length;
       await updateDoc(doc(db, 'booksRead', id), { status: statuses[nextIndex] });
     }
+  };
+
+  const updateRating = async (bookId: string, newRating: number) => {
+    setEntries(prev =>
+      prev.map(e => (e.id === bookId ? { ...e, rating: newRating } : e))
+    );
+    await updateDoc(doc(db, 'booksRead', bookId), { rating: newRating });
   };
 
   const pushNote = async (
@@ -186,7 +205,6 @@ const BookTracker: React.FC = () => {
 
   return (
     <div className="w-full p-4 space-y-6">
-      {/* Search */}
       <div className="relative">
         <input
           type="text"
@@ -221,7 +239,6 @@ const BookTracker: React.FC = () => {
         )}
       </div>
 
-      {/* Entries */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {entries.map(e => (
           <div key={e.id} className="bg-gray-800 rounded-lg p-4 space-y-4">
@@ -231,6 +248,7 @@ const BookTracker: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-lg">{e.title}</h3>
                   <p className="text-gray-400 text-sm">{e.authors.join(', ')}</p>
+                  <StarRating rating={e.rating || 0} onChange={(val) => updateRating(e.id, val)} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -248,7 +266,6 @@ const BookTracker: React.FC = () => {
               </div>
             </div>
 
-            {/* Conclusions & Remarks Sections */}
             {noteSections.map(section => (
               <details key={section} className="bg-gray-900 rounded p-2">
                 <summary className="font-semibold cursor-pointer capitalize">{section}</summary>
@@ -272,7 +289,6 @@ const BookTracker: React.FC = () => {
               </details>
             ))}
 
-            {/* Exercises with English labels */}
             <details className="bg-gray-900 rounded p-2">
               <summary className="font-semibold cursor-pointer">Exercises</summary>
               <div className="mt-2 space-y-2">
@@ -315,7 +331,6 @@ const BookTracker: React.FC = () => {
                 </div>
               </div>
             </details>
-
           </div>
         ))}
       </div>
