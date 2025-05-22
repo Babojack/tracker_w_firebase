@@ -21,7 +21,7 @@ interface Activity {
 }
 
 // ───────────────────────────────────────────
-// Activity options (including new sleep states)
+// Activity options (including new sleep states + anxiety/medication)
 // ───────────────────────────────────────────
 const activityOptions: Activity[] = [
   { id: 1, label: 'Reading', emoji: '📚' },
@@ -38,6 +38,9 @@ const activityOptions: Activity[] = [
   { id: 11, label: 'Dizzy', emoji: '😴' },
   { id: 12, label: 'Good Sleep', emoji: '🛌+' },
   { id: 13, label: 'Bad Sleep', emoji: '🛌-' },
+  // NEW: Anxiety/Medication state
+  { id: 14, label: 'Anxiety / Meds', emoji: '💊' },
+  { id: 15, label: 'Anxiety / Meds', emoji: '😰' },
 ];
 
 interface NoteItem {
